@@ -1,0 +1,41 @@
+# Monorepo Node Modules
+node_modules/
+dist/
+build/
+.eslintcache
+
+# Client-specific ignores
+client/node_modules/
+client/dist/
+client/build/
+client/.eslintcache
+
+# Server-specific virtual env
+server/venv/
+server/venv_new/
+server/__pycache__/
+server/controllers/__pycache__/
+server/routes/__pycache__/
+server/config/__pycache__/
+server/middleware/__pycache__/
+server/utils/__pycache__/
+server/*.pyc
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Exclude generated local PDFs
+server/*.pdf
+
+# CRITICAL SECURITY: Exclude secret keys and DB connection strings
+.env
+*.env
+server/.env
+client/.env.local
+client/.env.development.local
+client/.env.test.local
+client/.env.production.local
+
+# OS Specific
+.DS_Store
+Thumbs.db
+desktop.ini
