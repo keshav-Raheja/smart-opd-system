@@ -28,10 +28,19 @@ function Login() {
 
       login(token);
       toast.success("Welcome back!", `Logged in as ${user.name}`);
-      navigate("/");
+
+      // Redirect each role to their correct landing page
+      const roleRedirects = {
+        "Admin":        "/",
+        "Doctor":       "/",
+        "Receptionist": "/patients",
+        "Lab Staff":    "/ai-support",
+      };
+      navigate(roleRedirects[user.role] || "/patients");
     } catch (error) {
-      const msg = error.response?.data?.message || "Invalid credentials";
+      const msg = error.response?.data?.message || "Login failed. Please check your credentials.";
       toast.error("Login Failed", msg);
+
     } finally {
       setLoading(false);
     }

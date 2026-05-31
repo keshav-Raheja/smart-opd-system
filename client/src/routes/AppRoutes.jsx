@@ -27,11 +27,23 @@ function AppRoutes() {
         <Route path="/register" element={<Register />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Dashboard */}
+        {/* Dashboard — Admin & Doctor see full analytics; all roles can access */}
         <Route
           path="/"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR]}>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF]}>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* /dashboard alias */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF]}>
               <MainLayout>
                 <Dashboard />
               </MainLayout>
