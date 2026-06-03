@@ -7,18 +7,23 @@ import requests
 
 otp_collection = db["otp_verifications"]
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
-EMAIL_FROM     = os.environ.get("EMAIL_FROM", "onboarding@resend.dev")   # sender address
-EMAIL_USER     = os.environ.get("EMAIL_USER", "")                        # fallback display
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+EMAIL_USER    = os.environ.get("EMAIL_USER", "smartopdsystem@gmail.com")
 
 
-def _send_via_resend(to_email: str, otp: str) -> None:
-    """Send OTP email using Resend HTTPS API (works on Render free tier)."""
+def _send_via_brevo(to_email: str, otp: str) -> None:
+    """Send OTP email using Brevo Transactional Email HTTPS API.
+    Works on Render free tier — no SMTP, no domain verification needed.
+    Free tier: 300 emails/day to any recipient.
+    """
     payload = {
-        "from":    f"Smart OPD System <{EMAIL_FROM}>",
-        "to":      [to_email],
+        "sender": {
+            "name":  "Smart OPD System",
+            "email": EMAIL_USER,
+        },
+        "to": [{"email": to_email}],
         "subject": "Smart OPD — Email Verification Code",
-        "html": f"""
+        "htmlContent": f"""
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;
                     padding:32px;background:#f8faff;border-radius:12px;border:1px solid #e2e8f0;">
             <div style="text-align:center;margin-bottom:24px;">
@@ -40,13 +45,12 @@ def _send_via_resend(to_email: str, otp: str) -> None:
             </div>
         </div>
         """,
-        "text": f"Your Smart OPD verification OTP is: {otp}\n\nThis OTP is valid for 5 minutes.",
     }
 
     resp = requests.post(
-        "https://api.resend.com/emails",
+        "https://api.brevo.com/v3/smtp/email",
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "api-key":      BREVO_API_KEY,
             "Content-Type": "application/json",
         },
         json=payload,
@@ -54,7 +58,7 @@ def _send_via_resend(to_email: str, otp: str) -> None:
     )
 
     if resp.status_code not in (200, 201):
-        raise Exception(f"Resend API error {resp.status_code}: {resp.text}")
+        raise Exception(f"Brevo API error {resp.status_code}: {resp.text}")
 
 
 def send_otp():
@@ -75,7 +79,7 @@ def send_otp():
     })
 
     try:
-        _send_via_resend(email, otp)
+        _send_via_brevo(email, otp)
         return jsonify({"message": "OTP sent successfully"}), 200
 
     except Exception as e:
