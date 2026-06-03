@@ -15,6 +15,7 @@ function Register() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [demoOtp, setDemoOtp] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -40,9 +41,16 @@ function Register() {
     }
     setOtpLoading(true);
     try {
-      await api.post("/otp/send", { email: formData.email });
-      toast.success("OTP Sent", "A verification code has been sent to your email");
+      const res = await api.post("/otp/send", { email: formData.email });
       setOtpSent(true);
+      if (res.data.demo_otp) {
+        // Email service unavailable — OTP shown on screen (demo mode)
+        setDemoOtp(res.data.demo_otp);
+        setOtp(res.data.demo_otp);
+        toast.success("Demo Mode", "Email service unavailable — your OTP is shown below");
+      } else {
+        toast.success("OTP Sent", "A verification code has been sent to your email");
+      }
     } catch (error) {
       toast.error("Delivery Failed", error.response?.data?.message || "Could not send OTP");
     } finally {
@@ -319,6 +327,20 @@ function Register() {
                 border: "1px dashed rgba(59,130,246,0.3)",
                 borderRadius: 14, padding: 14,
               }}>
+                {demoOtp && (
+                  <div style={{
+                    background: "rgba(251,191,36,0.15)",
+                    border: "1px solid rgba(251,191,36,0.4)",
+                    borderRadius: 10, padding: "10px 14px",
+                    marginBottom: 12, fontSize: 13,
+                    color: "#fbbf24", fontWeight: 600,
+                  }}>
+                    ⚠️ Demo Mode — Email service not configured.<br/>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: "rgba(251,191,36,0.8)" }}>
+                      Your OTP is pre-filled below. Click Verify to continue.
+                    </span>
+                  </div>
+                )}
                 <label style={labelStyle}>Verification Code *</label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
