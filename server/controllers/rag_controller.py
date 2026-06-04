@@ -13,9 +13,10 @@ reports_collection = db["reports"]
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Models tried in order — if one quota is exhausted, next is used automatically
+# Models tried in order — if one quota/404, next is tried automatically
 GEMINI_MODELS = [
     "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
     "gemini-1.5-flash-8b",
     "gemini-1.5-pro",
@@ -72,7 +73,8 @@ def extract_text_from_image(filepath: str, client) -> str:
                 response = client.models.generate_content(model=model, contents=prompt_parts)
                 return response.text.strip()
             except Exception as model_err:
-                if "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err):
+                err_str = str(model_err)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "404" in err_str or "NOT_FOUND" in err_str:
                     continue
                 raise
         return "[All Gemini models quota exhausted for image extraction]"
@@ -185,7 +187,8 @@ def call_gemini(client, prompt: str) -> dict:
             return json.loads(raw)
 
         except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "404" in err_str or "NOT_FOUND" in err_str:
                 last_error = e
                 continue   # try next model
             raise          # non-quota error — surface immediately
