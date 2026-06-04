@@ -2,12 +2,10 @@ import os
 import tempfile
 import traceback
 import json
-import base64
 import fitz  # PyMuPDF
 from flask import request, jsonify
 from config.db import db
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 reports_collection = db["reports"]
 
@@ -15,11 +13,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Models tried in order — if one quota/404, next is tried automatically
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
     "gemini-1.5-flash-8b",
     "gemini-1.5-pro",
+    "gemini-2.0-flash",
 ]
 
 MEDICAL_DISCLAIMER = (
@@ -31,11 +28,12 @@ MEDICAL_DISCLAIMER = (
 )
 
 
-def get_client():
-    """Get a configured Gemini client."""
+def get_model(model_name: str):
+    """Configure and return a Gemini GenerativeModel."""
     if not GEMINI_API_KEY or GEMINI_API_KEY == "your_free_gemini_api_key_here":
         return None
-    return genai.Client(api_key=GEMINI_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
+    return genai.GenerativeModel(model_name)
 
 
 def extract_text_from_pdf(filepath: str) -> str:
@@ -51,52 +49,48 @@ def extract_text_from_pdf(filepath: str) -> str:
         return f"[PDF extraction error: {e}]"
 
 
-def extract_text_from_image(filepath: str, client) -> str:
+def extract_text_from_image(filepath: str) -> str:
     """Extract text from an image using Gemini Vision."""
     try:
-        with open(filepath, "rb") as f:
-            image_data = f.read()
+        import PIL.Image
+        img = PIL.Image.open(filepath)
 
-        ext = os.path.splitext(filepath)[1].lower().strip(".")
-        mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
-                    "tiff": "image/tiff", "tif": "image/tiff", "bmp": "image/bmp"}
-        mime_type = mime_map.get(ext, "image/jpeg")
-
-        prompt_parts = [
+        prompt = (
             "Extract ALL text from this medical report image exactly as it appears, "
             "including all numbers, values, units, reference ranges, and labels. "
-            "Do not interpret or summarize — just extract the raw text.",
-            types.Part.from_bytes(data=image_data, mime_type=mime_type)
-        ]
-        for model in GEMINI_MODELS:
+            "Do not interpret or summarize — just extract the raw text."
+        )
+
+        for model_name in GEMINI_MODELS:
             try:
-                response = client.models.generate_content(model=model, contents=prompt_parts)
+                model = get_model(model_name)
+                if not model:
+                    return "[Gemini API key not configured]"
+                response = model.generate_content([prompt, img])
                 return response.text.strip()
-            except Exception as model_err:
-                err_str = str(model_err)
-                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "404" in err_str or "NOT_FOUND" in err_str:
+            except Exception as e:
+                err = str(e)
+                if any(x in err for x in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "quota"]):
                     continue
                 raise
+
         return "[All Gemini models quota exhausted for image extraction]"
     except Exception as e:
         return f"[Image text extraction error: {e}]"
 
 
-def extract_text_from_file(filepath: str, client=None) -> str:
+def extract_text_from_file(filepath: str) -> str:
     """Smart text extraction based on file type."""
     ext = os.path.splitext(filepath)[1].lower()
 
     if ext == ".pdf":
         text = extract_text_from_pdf(filepath)
-        # If PDF has very little text (possibly scanned), try vision
-        if len(text) < 50 and client:
-            return extract_text_from_image(filepath, client)
+        if len(text) < 50:
+            return extract_text_from_image(filepath)
         return text
 
     elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
-        if client:
-            return extract_text_from_image(filepath, client)
-        return "[Image analysis requires Gemini API key]"
+        return extract_text_from_image(filepath)
 
     else:
         try:
@@ -108,8 +102,8 @@ def extract_text_from_file(filepath: str, client=None) -> str:
 
 def build_analysis_prompt(report_text: str, user_question: str) -> str:
     """Build the structured medical analysis prompt."""
-    return f"""You are an expert medical AI assistant analyzing a patient's medical report. 
-Your analysis must be accurate, evidence-based, and cautious. 
+    return f"""You are an expert medical AI assistant analyzing a patient's medical report.
+Your analysis must be accurate, evidence-based, and cautious.
 Base your response ONLY on the information present in the report.
 
 MEDICAL REPORT CONTENT:
@@ -159,21 +153,27 @@ CRITICAL RULES:
 5. Return ONLY valid JSON — no markdown, no extra text"""
 
 
-def call_gemini(client, prompt: str) -> dict:
-    """Call Gemini with automatic model fallback if quota is exhausted."""
+def call_gemini(prompt: str) -> dict:
+    """Call Gemini with automatic model fallback if quota/404 occurs."""
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_free_gemini_api_key_here":
+        raise Exception(
+            "Gemini API key not configured. Get your FREE key at "
+            "https://aistudio.google.com/app/apikey and add GEMINI_API_KEY to Render environment."
+        )
+
+    genai.configure(api_key=GEMINI_API_KEY)
     last_error = None
 
-    for model in GEMINI_MODELS:
+    for model_name in GEMINI_MODELS:
         try:
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
+            model = genai.GenerativeModel(
+                model_name,
+                generation_config=genai.types.GenerationConfig(
                     temperature=0.1,
                     max_output_tokens=3000,
                 )
             )
-
+            response = model.generate_content(prompt)
             raw = response.text.strip()
 
             # Remove markdown code fences if present
@@ -182,43 +182,40 @@ def call_gemini(client, prompt: str) -> dict:
                 raw = parts[1] if len(parts) > 1 else raw
                 if raw.startswith("json"):
                     raw = raw[4:]
-
             raw = raw.strip().rstrip("```").strip()
+
             return json.loads(raw)
 
         except Exception as e:
             err_str = str(e)
-            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "404" in err_str or "NOT_FOUND" in err_str:
+            if any(x in err_str for x in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "quota"]):
                 last_error = e
                 continue   # try next model
-            raise          # non-quota error — surface immediately
+            raise          # real error — surface it
 
     # All models exhausted
     raise Exception(
-        "AI service is temporarily unavailable due to high usage. "
-        "Please try again in a few minutes. "
-        "If this keeps happening, generate a new Gemini API key at "
-        "https://aistudio.google.com/app/apikey and update GEMINI_API_KEY in Render."
+        "AI service temporarily unavailable — all model quotas exhausted. "
+        "Please try again in a few minutes, or generate a new Gemini API key at "
+        "https://aistudio.google.com/app/apikey (create in a NEW project)."
     )
 
 
 def analyze_report():
     """Analyze an existing report by report_id or filepath."""
-    client = get_client()
-    if not client:
+    if not GEMINI_API_KEY:
         return jsonify({
             "success": False,
-            "error": "Gemini API key not configured. Please:\n"
-                     "1. Go to https://aistudio.google.com/app/apikey\n"
-                     "2. Click 'Create API Key' (it's FREE)\n"
-                     "3. Copy the key and add GEMINI_API_KEY=your_key to server/.env\n"
-                     "4. Restart the server"
+            "error": "Gemini API key not configured."
         }), 503
 
     try:
         data = request.json or {}
         report_id = data.get("report_id")
-        user_question = data.get("question", "What does this medical report indicate? Are the values normal? What precautions should I take?")
+        user_question = data.get(
+            "question",
+            "What does this medical report indicate? Are the values normal? What precautions should I take?"
+        )
         filepath = data.get("filepath")
 
         if report_id and not filepath:
@@ -229,18 +226,21 @@ def analyze_report():
             filepath = report.get("filepath")
 
         if not filepath or not os.path.exists(filepath):
-            return jsonify({"success": False, "error": "Report file not found on server. It may have been moved or deleted."}), 404
+            return jsonify({
+                "success": False,
+                "error": "Report file not found on server. It may have been moved or deleted."
+            }), 404
 
-        report_text = extract_text_from_file(filepath, client)
+        report_text = extract_text_from_file(filepath)
 
         if not report_text or len(report_text.strip()) < 20:
             return jsonify({
                 "success": False,
-                "error": "Could not extract meaningful text from this report. The file may be a scanned image or corrupted."
+                "error": "Could not extract meaningful text from this report."
             }), 422
 
-        prompt = build_analysis_prompt(report_text, user_question)
-        analysis = call_gemini(client, prompt)
+        prompt   = build_analysis_prompt(report_text, user_question)
+        analysis = call_gemini(prompt)
 
         return jsonify({
             "success": True,
@@ -252,20 +252,19 @@ def analyze_report():
         return jsonify({"success": False, "error": f"AI response parsing error: {e}"}), 500
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"success": False, "error": f"Analysis failed: {str(e)}"}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 def analyze_uploaded_report():
     """Analyze a freshly uploaded report file."""
-    client = get_client()
-    if not client:
+    if not GEMINI_API_KEY:
         return jsonify({
             "success": False,
-            "error": "Gemini API key not configured. Get your FREE key at https://aistudio.google.com/app/apikey and add GEMINI_API_KEY=your_key to server/.env"
+            "error": "Gemini API key not configured. Get your FREE key at https://aistudio.google.com/app/apikey"
         }), 503
 
     try:
-        file = request.files.get("file")
+        file          = request.files.get("file")
         user_question = request.form.get(
             "question",
             "What does this medical report indicate? Are the values normal? What precautions should I take?"
@@ -274,7 +273,7 @@ def analyze_uploaded_report():
         if not file:
             return jsonify({"success": False, "error": "No file provided"}), 400
 
-        ext = os.path.splitext(file.filename)[1].lower()
+        ext     = os.path.splitext(file.filename)[1].lower()
         allowed = [".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
         if ext not in allowed:
             return jsonify({
@@ -282,16 +281,12 @@ def analyze_uploaded_report():
                 "error": f"File type '{ext}' not supported. Please upload: PDF, JPG, PNG, or TIFF"
             }), 400
 
-        if not file.filename:
-            return jsonify({"success": False, "error": "Invalid filename"}), 400
-
-        # Save to temp file
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             file.save(tmp.name)
             tmp_path = tmp.name
 
         try:
-            report_text = extract_text_from_file(tmp_path, client)
+            report_text = extract_text_from_file(tmp_path)
 
             if not report_text or len(report_text.strip()) < 20:
                 return jsonify({
@@ -299,8 +294,8 @@ def analyze_uploaded_report():
                     "error": "Could not extract meaningful text from this file. Try uploading a text-based PDF."
                 }), 422
 
-            prompt = build_analysis_prompt(report_text, user_question)
-            analysis = call_gemini(client, prompt)
+            prompt   = build_analysis_prompt(report_text, user_question)
+            analysis = call_gemini(prompt)
 
             return jsonify({
                 "success": True,
@@ -316,7 +311,7 @@ def analyze_uploaded_report():
                 pass
 
     except json.JSONDecodeError as e:
-        return jsonify({"success": False, "error": f"AI response parsing error. Please try again: {e}"}), 500
+        return jsonify({"success": False, "error": f"AI response parsing error. Please try again."}), 500
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"success": False, "error": f"Analysis failed: {str(e)}"}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
