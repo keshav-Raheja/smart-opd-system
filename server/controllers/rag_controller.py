@@ -5,18 +5,18 @@ import json
 import fitz  # PyMuPDF
 from flask import request, jsonify
 from config.db import db
-import google.generativeai as genai
+import requests as http_requests
 
 reports_collection = db["reports"]
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Models tried in order — if one quota/404, next is tried automatically
-GEMINI_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
-    "gemini-2.0-flash",
+# Models tried in order — free tier, no quota issues
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
 ]
 
 MEDICAL_DISCLAIMER = (
@@ -26,14 +26,6 @@ MEDICAL_DISCLAIMER = (
     "a qualified and licensed healthcare professional before making any medical decisions. "
     "In case of a medical emergency, contact emergency services immediately."
 )
-
-
-def get_model(model_name: str):
-    """Configure and return a Gemini GenerativeModel."""
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_free_gemini_api_key_here":
-        return None
-    genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel(model_name)
 
 
 def extract_text_from_pdf(filepath: str) -> str:
@@ -49,48 +41,15 @@ def extract_text_from_pdf(filepath: str) -> str:
         return f"[PDF extraction error: {e}]"
 
 
-def extract_text_from_image(filepath: str) -> str:
-    """Extract text from an image using Gemini Vision."""
-    try:
-        import PIL.Image
-        img = PIL.Image.open(filepath)
-
-        prompt = (
-            "Extract ALL text from this medical report image exactly as it appears, "
-            "including all numbers, values, units, reference ranges, and labels. "
-            "Do not interpret or summarize — just extract the raw text."
-        )
-
-        for model_name in GEMINI_MODELS:
-            try:
-                model = get_model(model_name)
-                if not model:
-                    return "[Gemini API key not configured]"
-                response = model.generate_content([prompt, img])
-                return response.text.strip()
-            except Exception as e:
-                err = str(e)
-                if any(x in err for x in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "quota"]):
-                    continue
-                raise
-
-        return "[All Gemini models quota exhausted for image extraction]"
-    except Exception as e:
-        return f"[Image text extraction error: {e}]"
-
-
 def extract_text_from_file(filepath: str) -> str:
     """Smart text extraction based on file type."""
     ext = os.path.splitext(filepath)[1].lower()
 
     if ext == ".pdf":
-        text = extract_text_from_pdf(filepath)
-        if len(text) < 50:
-            return extract_text_from_image(filepath)
-        return text
+        return extract_text_from_pdf(filepath)
 
     elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
-        return extract_text_from_image(filepath)
+        return "[Image files: text extraction not supported without Vision API. Please upload a PDF.]"
 
     else:
         try:
@@ -113,7 +72,7 @@ MEDICAL REPORT CONTENT:
 
 PATIENT QUESTION: {user_question}
 
-Analyze this report and respond in the following JSON format ONLY (no other text):
+Analyze this report and respond in the following JSON format ONLY (no other text, no markdown):
 {{
   "summary": "Clear 2-3 sentence summary of what this report shows and its overall significance",
   "possible_conditions": [
@@ -145,36 +104,46 @@ Analyze this report and respond in the following JSON format ONLY (no other text
   "disclaimer": "This AI analysis is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare professional."
 }}
 
-CRITICAL RULES:
-1. Only mention conditions that have clear evidence in the report
-2. If values are normal, say so explicitly
-3. If something cannot be determined from the report, state "Cannot be determined from available information"
-4. Always prefer caution over optimism in urgency assessment
-5. Return ONLY valid JSON — no markdown, no extra text"""
+CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no extra text."""
 
 
-def call_gemini(prompt: str) -> dict:
-    """Call Gemini with automatic model fallback if quota/404 occurs."""
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_free_gemini_api_key_here":
+def call_groq(prompt: str) -> dict:
+    """Call Groq API with automatic model fallback."""
+    if not GROQ_API_KEY:
         raise Exception(
-            "Gemini API key not configured. Get your FREE key at "
-            "https://aistudio.google.com/app/apikey and add GEMINI_API_KEY to Render environment."
+            "Groq API key not configured. Get your FREE key at "
+            "https://console.groq.com — sign up, go to API Keys, create a key. "
+            "Then add GROQ_API_KEY to Render environment variables."
         )
 
-    genai.configure(api_key=GEMINI_API_KEY)
     last_error = None
 
-    for model_name in GEMINI_MODELS:
+    for model in GROQ_MODELS:
         try:
-            model = genai.GenerativeModel(
-                model_name,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    max_output_tokens=3000,
-                )
+            resp = http_requests.post(
+                GROQ_API_URL,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.1,
+                    "max_tokens": 3000,
+                },
+                timeout=60,
             )
-            response = model.generate_content(prompt)
-            raw = response.text.strip()
+
+            if resp.status_code == 429:
+                last_error = Exception(f"Rate limited on {model}")
+                continue  # try next model
+
+            if resp.status_code != 200:
+                last_error = Exception(f"Groq API error {resp.status_code}: {resp.text}")
+                continue
+
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
 
             # Remove markdown code fences if present
             if raw.startswith("```"):
@@ -186,37 +155,30 @@ def call_gemini(prompt: str) -> dict:
 
             return json.loads(raw)
 
+        except json.JSONDecodeError as e:
+            raise Exception(f"AI response parsing error — please try again: {e}")
         except Exception as e:
             err_str = str(e)
-            if any(x in err_str for x in ["429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND", "quota"]):
+            if "429" in err_str or "rate" in err_str.lower():
                 last_error = e
-                continue   # try next model
-            raise          # real error — surface it
+                continue
+            raise
 
-    # All models exhausted
     raise Exception(
-        "AI service temporarily unavailable — all model quotas exhausted. "
-        "Please try again in a few minutes, or generate a new Gemini API key at "
-        "https://aistudio.google.com/app/apikey (create in a NEW project)."
+        "All Groq models temporarily rate-limited. Please wait 1 minute and try again."
     )
 
 
 def analyze_report():
     """Analyze an existing report by report_id or filepath."""
-    if not GEMINI_API_KEY:
-        return jsonify({
-            "success": False,
-            "error": "Gemini API key not configured."
-        }), 503
+    if not GROQ_API_KEY:
+        return jsonify({"success": False, "error": "Groq API key not configured."}), 503
 
     try:
-        data = request.json or {}
-        report_id = data.get("report_id")
-        user_question = data.get(
-            "question",
-            "What does this medical report indicate? Are the values normal? What precautions should I take?"
-        )
-        filepath = data.get("filepath")
+        data          = request.json or {}
+        report_id     = data.get("report_id")
+        user_question = data.get("question", "What does this medical report indicate? Are the values normal? What precautions should I take?")
+        filepath      = data.get("filepath")
 
         if report_id and not filepath:
             from bson import ObjectId
@@ -226,21 +188,14 @@ def analyze_report():
             filepath = report.get("filepath")
 
         if not filepath or not os.path.exists(filepath):
-            return jsonify({
-                "success": False,
-                "error": "Report file not found on server. It may have been moved or deleted."
-            }), 404
+            return jsonify({"success": False, "error": "Report file not found on server."}), 404
 
         report_text = extract_text_from_file(filepath)
 
         if not report_text or len(report_text.strip()) < 20:
-            return jsonify({
-                "success": False,
-                "error": "Could not extract meaningful text from this report."
-            }), 422
+            return jsonify({"success": False, "error": "Could not extract text from this report."}), 422
 
-        prompt   = build_analysis_prompt(report_text, user_question)
-        analysis = call_gemini(prompt)
+        analysis = call_groq(build_analysis_prompt(report_text, user_question))
 
         return jsonify({
             "success": True,
@@ -248,8 +203,6 @@ def analyze_report():
             "extracted_text_preview": report_text[:300] + "..." if len(report_text) > 300 else report_text
         }), 200
 
-    except json.JSONDecodeError as e:
-        return jsonify({"success": False, "error": f"AI response parsing error: {e}"}), 500
     except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
@@ -257,18 +210,12 @@ def analyze_report():
 
 def analyze_uploaded_report():
     """Analyze a freshly uploaded report file."""
-    if not GEMINI_API_KEY:
-        return jsonify({
-            "success": False,
-            "error": "Gemini API key not configured. Get your FREE key at https://aistudio.google.com/app/apikey"
-        }), 503
+    if not GROQ_API_KEY:
+        return jsonify({"success": False, "error": "Groq API key not configured. Get it free at https://console.groq.com"}), 503
 
     try:
         file          = request.files.get("file")
-        user_question = request.form.get(
-            "question",
-            "What does this medical report indicate? Are the values normal? What precautions should I take?"
-        )
+        user_question = request.form.get("question", "What does this medical report indicate? Are the values normal? What precautions should I take?")
 
         if not file:
             return jsonify({"success": False, "error": "No file provided"}), 400
@@ -276,10 +223,7 @@ def analyze_uploaded_report():
         ext     = os.path.splitext(file.filename)[1].lower()
         allowed = [".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
         if ext not in allowed:
-            return jsonify({
-                "success": False,
-                "error": f"File type '{ext}' not supported. Please upload: PDF, JPG, PNG, or TIFF"
-            }), 400
+            return jsonify({"success": False, "error": f"File type '{ext}' not supported. Please upload a PDF."}), 400
 
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             file.save(tmp.name)
@@ -289,13 +233,9 @@ def analyze_uploaded_report():
             report_text = extract_text_from_file(tmp_path)
 
             if not report_text or len(report_text.strip()) < 20:
-                return jsonify({
-                    "success": False,
-                    "error": "Could not extract meaningful text from this file. Try uploading a text-based PDF."
-                }), 422
+                return jsonify({"success": False, "error": "Could not extract text from this file. Try a text-based PDF."}), 422
 
-            prompt   = build_analysis_prompt(report_text, user_question)
-            analysis = call_gemini(prompt)
+            analysis = call_groq(build_analysis_prompt(report_text, user_question))
 
             return jsonify({
                 "success": True,
@@ -310,8 +250,6 @@ def analyze_uploaded_report():
             except Exception:
                 pass
 
-    except json.JSONDecodeError as e:
-        return jsonify({"success": False, "error": f"AI response parsing error. Please try again."}), 500
     except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
