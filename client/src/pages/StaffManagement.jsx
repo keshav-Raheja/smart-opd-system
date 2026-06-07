@@ -2,14 +2,23 @@ import { useState, useEffect } from "react";
 import api from "../services/api";
 import { useToast } from "../context/ToastContext";
 
+const OPD_TYPES = ["General", "Dental", "Cardiology", "Orthopedics", "Neurology", "Pediatrics", "Gynecology", "Dermatology", "Other"];
+
 function StaffManagement() {
   const toast = useToast();
   const [clinic, setClinic] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Staff creation form
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
+
+  // Clinic setup form (for doctors with no clinic)
+  const [setupForm, setSetupForm] = useState({ name: "", type: "General", address: "", contact: "" });
+  const [settingUp, setSettingUp] = useState(false);
+
+  const [error, setError] = useState("");
 
   const loadClinicData = async () => {
     setLoading(true);
@@ -18,7 +27,9 @@ function StaffManagement() {
       const res = await api.get("/opd/my-clinic");
       setClinic(res.data);
     } catch (e) {
-      setError(e.response?.data?.message || "Failed to load clinic details.");
+      // Catch backend 400 when doctor has no clinic
+      const msg = e.response?.data?.message || "Failed to load clinic details.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -27,6 +38,32 @@ function StaffManagement() {
   useEffect(() => {
     loadClinicData();
   }, []);
+
+  const handleSetupClinic = async (e) => {
+    e.preventDefault();
+    if (!setupForm.name.trim()) {
+      toast.error("Validation Error", "Clinic Name is required");
+      return;
+    }
+    setSettingUp(true);
+    try {
+      const res = await api.post("/opd/setup-clinic", setupForm);
+      const { token, user } = res.data;
+      
+      // Update local storage with updated JWT token and user info
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("role", user.role);
+      
+      toast.success("Success", "Clinic set up successfully!");
+      // Reload clinic data
+      loadClinicData();
+    } catch (e) {
+      toast.error("Setup Failed", e.response?.data?.message || "Could not set up clinic");
+    } finally {
+      setSettingUp(false);
+    }
+  };
 
   const handleCreateReceptionist = async (e) => {
     e.preventDefault();
@@ -60,6 +97,8 @@ function StaffManagement() {
     }
   };
 
+  const hasNoClinic = error === "No clinic associated with your account";
+
   if (loading) {
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)" }}>
@@ -68,28 +107,113 @@ function StaffManagement() {
     );
   }
 
+  // Clinic Setup Page UX
+  if (hasNoClinic) {
+    return (
+      <div className="animate-fade-in" style={{ padding: "24px", maxWidth: "600px", margin: "0 auto" }}>
+        <div className="page-header" style={{ marginBottom: "28px", textAlign: "center" }}>
+          <h1 className="page-title" style={{ color: "var(--text-primary)" }}>🏥 Set Up Your Clinic</h1>
+          <p className="page-subtitle" style={{ color: "var(--text-secondary)" }}>Register your clinic/OPD details to start managing staff and patients</p>
+        </div>
+
+        <div className="card" style={{ padding: 30, boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}>
+          <form onSubmit={handleSetupClinic} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>Clinic / OPD Name *</label>
+              <input
+                className="form-input"
+                placeholder="e.g. Smile Dental Clinic"
+                value={setupForm.name}
+                onChange={e => setSetupForm({ ...setupForm, name: e.target.value })}
+                required
+                disabled={settingUp}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>OPD Type *</label>
+              <select
+                className="form-input"
+                value={setupForm.type}
+                onChange={e => setSetupForm({ ...setupForm, type: e.target.value })}
+                disabled={settingUp}
+              >
+                {OPD_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>Contact Number</label>
+              <input
+                className="form-input"
+                placeholder="e.g. +91 98765 43210"
+                value={setupForm.contact}
+                onChange={e => setSetupForm({ ...setupForm, contact: e.target.value })}
+                disabled={settingUp}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>Clinic Address</label>
+              <input
+                className="form-input"
+                placeholder="e.g. 123 Main St, New Delhi"
+                value={setupForm.address}
+                onChange={e => setSetupForm({ ...setupForm, address: e.target.value })}
+                disabled={settingUp}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={settingUp}
+              style={{
+                width: "100%",
+                padding: "13px",
+                borderRadius: "12px",
+                border: "none",
+                background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                color: "#ffffff",
+                fontSize: "15px",
+                fontWeight: "700",
+                cursor: settingUp ? "not-allowed" : "pointer",
+                boxShadow: "0 4px 14px rgba(59,130,246,0.3)",
+                transition: "all 0.2s ease",
+                marginTop: "10px",
+              }}
+            >
+              {settingUp ? "Setting up Clinic..." : "🚀 Initialize Clinic"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in" style={{ padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
       <div className="page-header" style={{ marginBottom: "28px" }}>
-        <h1 className="page-title">👥 Staff Management</h1>
-        <p className="page-subtitle">Manage receptionist accounts for your clinic</p>
+        <h1 className="page-title" style={{ color: "var(--text-primary)" }}>👥 Staff Management</h1>
+        <p className="page-subtitle" style={{ color: "var(--text-secondary)" }}>Manage receptionist accounts for your clinic</p>
       </div>
 
-      {error && (
+      {error && !hasNoClinic && (
         <div style={{ background: "#fee2e2", color: "#dc2626", padding: "12px 16px", borderRadius: 8, marginBottom: 20, fontSize: 14 }}>
           {error}
         </div>
       )}
 
-      {/* Clinic Details Row */}
+      {/* Clinic Details Card */}
       {clinic && (
-        <div className="card" style={{ marginBottom: 24, padding: 20, background: "linear-gradient(135deg, rgba(30,58,138,0.1), rgba(17,24,39,0.5))", border: "1px solid rgba(59,130,246,0.15)" }}>
+        <div className="card" style={{ marginBottom: 24, padding: 20, background: "linear-gradient(135deg, rgba(37,99,235,0.06), rgba(31,41,55,0.02))", border: "1px solid rgba(37,99,235,0.15)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
             <div>
-              <span style={{ fontSize: 11, background: "rgba(59,130,246,0.15)", color: "#93c5fd", padding: "2px 8px", borderRadius: 20, fontWeight: 700, textTransform: "uppercase" }}>
+              <span style={{ fontSize: 11, background: "rgba(37,99,235,0.12)", color: "#2563eb", padding: "2px 8px", borderRadius: 20, fontWeight: 700, textTransform: "uppercase" }}>
                 {clinic.type} OPD
               </span>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: "#f8fafc", margin: "6px 0 2px" }}>{clinic.name}</h2>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", margin: "6px 0 2px" }}>{clinic.name}</h2>
               {clinic.address && <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>📍 {clinic.address}</div>}
               {clinic.contact && <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>📞 {clinic.contact}</div>}
             </div>
@@ -101,12 +225,12 @@ function StaffManagement() {
         
         {/* Create Receptionist Card */}
         <div className="card" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
             <span>➕</span> Create Receptionist
           </h2>
           <form onSubmit={handleCreateReceptionist} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Full Name *</label>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>Full Name *</label>
               <input
                 className="form-input"
                 placeholder="e.g. Priya Sharma"
@@ -117,7 +241,7 @@ function StaffManagement() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Email Address *</label>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>Email Address *</label>
               <input
                 type="email"
                 className="form-input"
@@ -129,7 +253,7 @@ function StaffManagement() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Password *</label>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>Password *</label>
               <div style={{ position: "relative" }}>
                 <input
                   type={showPass ? "text" : "password"}
@@ -153,15 +277,33 @@ function StaffManagement() {
                 </button>
               </div>
             </div>
-            <button type="submit" className="btn-primary" style={{ marginTop: 6 }} disabled={submitting}>
-              {submitting ? "Creating..." : "Create Account"}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "none",
+                background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                color: "#ffffff",
+                fontSize: "14px",
+                fontWeight: "700",
+                cursor: submitting ? "not-allowed" : "pointer",
+                boxShadow: "0 4px 12px rgba(59,130,246,0.2)",
+                transition: "all 0.2s ease",
+                marginTop: "10px",
+              }}
+            >
+              {submitting ? "Creating Account..." : "Create Receptionist Account"}
             </button>
           </form>
         </div>
 
         {/* Staff List Card */}
         <div className="card" style={{ padding: 24, display: "flex", flexDirection: "column" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
             <span>📋</span> Active Receptionists
           </h2>
 
@@ -185,7 +327,7 @@ function StaffManagement() {
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>{rec.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{rec.name}</div>
                     <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{rec.email}</div>
                   </div>
                   <button
