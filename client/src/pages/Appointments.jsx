@@ -31,9 +31,30 @@ const Appointments = () => {
     name: "", age: "", gender: "Male", phone: "", address: "", blood_group: "O+",
   });
 
+  // Get local date and time timezone-safely
+  const getLocalNow = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return {
+      date: `${year}-${month}-${day}`,
+      time: `${hours}:${minutes}`
+    };
+  };
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const defaultDoctorName = user.role === "Doctor" ? user.name : "";
+  const { date: defaultDate, time: defaultTime } = getLocalNow();
+
   // Appointment scheduling details
   const [formData, setFormData] = useState({
-    doctor_name: "", appointment_date: "", appointment_time: "", reason: "",
+    doctor_name: defaultDoctorName,
+    appointment_date: defaultDate,
+    appointment_time: defaultTime,
+    reason: "",
   });
 
   const fetchAppointments = async () => {
@@ -110,7 +131,13 @@ const Appointments = () => {
       fetchAppointments();
       
       // Reset forms
-      setFormData({ doctor_name: "", appointment_date: "", appointment_time: "", reason: "" });
+      const { date: resetDate, time: resetTime } = getLocalNow();
+      setFormData({
+        doctor_name: defaultDoctorName,
+        appointment_date: resetDate,
+        appointment_time: resetTime,
+        reason: "",
+      });
       setNewPatientData({ name: "", age: "", gender: "Male", phone: "", address: "", blood_group: "O+" });
       setSelectedPatient(null);
       setSearchQuery("");
