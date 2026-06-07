@@ -11,6 +11,7 @@ function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -25,7 +26,7 @@ function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await api.post("/auth/login", { email, password });
+      const response = await api.post("/auth/login", { email, password, clinic_name: clinicName });
       const { token, user } = response.data;
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
@@ -201,6 +202,36 @@ function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
+                  style={{
+                    width: "100%", boxSizing: "border-box",
+                    paddingLeft: 40, paddingRight: 14, paddingTop: 12, paddingBottom: 12,
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 12, color: "#f1f5f9", fontSize: 14,
+                    outline: "none", transition: "border-color 0.2s",
+                  }}
+                  onFocus={e => e.target.style.borderColor = "rgba(59,130,246,0.6)"}
+                  onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.12)"}
+                />
+              </div>
+            </div>
+
+            {/* Clinic Name */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 6 }}>
+                Clinic Name <span style={{ color: "rgba(255,255,255,0.4)", fontWeight: 400 }}>(Required for Receptionists)</span>
+              </label>
+              <div style={{ position: "relative" }}>
+                <span style={{
+                  position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)",
+                  fontSize: 15, color: "rgba(255,255,255,0.4)",
+                }}>🏢</span>
+                <input
+                  id="login-clinic-name"
+                  type="text"
+                  placeholder="e.g. Smile Dental Clinic"
+                  value={clinicName}
+                  onChange={(e) => setClinicName(e.target.value)}
                   style={{
                     width: "100%", boxSizing: "border-box",
                     paddingLeft: 40, paddingRight: 14, paddingTop: 12, paddingBottom: 12,

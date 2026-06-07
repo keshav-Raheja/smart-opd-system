@@ -51,7 +51,7 @@ def get_all_opds():
 
         # Enrich doctor list with names/emails
         doctors = []
-        for uid in opd.get("doctors", []):
+        for uid in (opd.get("doctors") or []):
             try:
                 u = users_collection.find_one({"_id": ObjectId(uid)}, {"name": 1, "email": 1, "role": 1})
                 if u:
@@ -62,7 +62,7 @@ def get_all_opds():
 
         # Enrich receptionist list
         receptionists = []
-        for uid in opd.get("receptionists", []):
+        for uid in (opd.get("receptionists") or []):
             try:
                 u = users_collection.find_one({"_id": ObjectId(uid)}, {"name": 1, "email": 1, "role": 1})
                 if u:
@@ -163,3 +163,49 @@ def delete_opd(opd_id):
 
     opds_collection.delete_one({"_id": ObjectId(opd_id)})
     return jsonify({"message": "OPD deleted successfully"}), 200
+
+
+def get_my_clinic():
+    user = request.user
+    opd_id = user.get("opd_id")
+    if not opd_id:
+        return jsonify({"message": "No clinic associated with your account"}), 400
+
+    try:
+        opd = opds_collection.find_one({"_id": ObjectId(opd_id)})
+    except Exception:
+        return jsonify({"message": "Invalid clinic ID"}), 400
+
+    if not opd:
+        return jsonify({"message": "Clinic not found"}), 404
+
+    opd["_id"] = str(opd["_id"])
+    if isinstance(opd.get("created_at"), datetime.datetime):
+        opd["created_at"] = opd["created_at"].isoformat()
+
+    # Enrich doctor list
+    doctors = []
+    for uid in (opd.get("doctors") or []):
+        try:
+            u = users_collection.find_one({"_id": ObjectId(uid)}, {"name": 1, "email": 1, "role": 1})
+            if u:
+                u["_id"] = str(u["_id"])
+                doctors.append(u)
+        except Exception:
+            pass
+
+    # Enrich receptionist list
+    receptionists = []
+    for uid in (opd.get("receptionists") or []):
+        try:
+            u = users_collection.find_one({"_id": ObjectId(uid)}, {"name": 1, "email": 1, "role": 1})
+            if u:
+                u["_id"] = str(u["_id"])
+                receptionists.append(u)
+        except Exception:
+            pass
+
+    opd["doctors_detail"]       = doctors
+    opd["receptionists_detail"] = receptionists
+
+    return jsonify(opd), 200

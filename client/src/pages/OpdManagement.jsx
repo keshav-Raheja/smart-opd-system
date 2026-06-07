@@ -1,13 +1,9 @@
 import { useState, useEffect } from "react";
-
-const API = import.meta.env.VITE_API_URL || "";
+import api from "../services/api";
 
 const OPD_TYPES = ["General", "Dental", "Cardiology", "Orthopedics", "Neurology", "Pediatrics", "Gynecology", "Dermatology", "Other"];
 
 function OpdManagement() {
-  const token = localStorage.getItem("token");
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-
   const [opds, setOpds] = useState([]);
   const [unassigned, setUnassigned] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,13 +14,14 @@ function OpdManagement() {
 
   const loadData = async () => {
     setLoading(true);
+    setError("");
     try {
       const [opdsRes, unassignedRes] = await Promise.all([
-        fetch(`${API}/api/opd/`, { headers }),
-        fetch(`${API}/api/opd/unassigned`, { headers }),
+        api.get("/opd/"),
+        api.get("/opd/unassigned"),
       ]);
-      setOpds(await opdsRes.json());
-      setUnassigned(await unassignedRes.json());
+      setOpds(opdsRes.data);
+      setUnassigned(unassignedRes.data);
     } catch (e) {
       setError("Failed to load OPD data");
     }
@@ -38,17 +35,14 @@ function OpdManagement() {
     if (!form.name.trim()) return setError("OPD name is required");
     setCreating(true);
     setError("");
+    setSuccess("");
     try {
-      const res = await fetch(`${API}/api/opd/`, {
-        method: "POST", headers, body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      const res = await api.post("/opd/", form);
       setSuccess(`OPD "${form.name}" created!`);
       setForm({ name: "", type: "General", address: "", contact: "" });
       loadData();
     } catch (e) {
-      setError(e.message);
+      setError(e.response?.data?.message || "Failed to create OPD");
     }
     setCreating(false);
   };
@@ -58,9 +52,9 @@ function OpdManagement() {
       ? (role === "Doctor" ? "add_doctor" : "add_receptionist")
       : (role === "Doctor" ? "remove_doctor" : "remove_receptionist");
     try {
-      await fetch(`${API}/api/opd/${opdId}`, {
-        method: "PUT", headers, body: JSON.stringify({ [field]: userId }),
-      });
+      setError("");
+      setSuccess("");
+      await api.put(`/opd/${opdId}`, { [field]: userId });
       setSuccess(action === "add" ? "User assigned!" : "User removed!");
       loadData();
     } catch (e) {
@@ -71,7 +65,9 @@ function OpdManagement() {
   const deleteOpd = async (opdId, name) => {
     if (!window.confirm(`Delete OPD "${name}"? All staff will be unassigned.`)) return;
     try {
-      await fetch(`${API}/api/opd/${opdId}`, { method: "DELETE", headers });
+      setError("");
+      setSuccess("");
+      await api.delete(`/opd/${opdId}`);
       setSuccess(`OPD "${name}" deleted.`);
       loadData();
     } catch (e) {

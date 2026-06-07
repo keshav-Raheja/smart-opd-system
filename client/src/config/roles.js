@@ -17,4 +17,5 @@ export const ROLE_ACCESS = {
   myFeeConfig: [ROLES.DOCTOR],
   analytics: [ROLES.ADMIN],
   opdManagement: [ROLES.ADMIN],   // NEW
+  staffManagement: [ROLES.DOCTOR, ROLES.ADMIN],
 };

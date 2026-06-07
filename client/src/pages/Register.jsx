@@ -21,7 +21,11 @@ function Register() {
     name: "",
     email: "",
     password: "",
-    role: "Receptionist",
+    role: "Doctor",
+    clinic_name: "",
+    clinic_type: "General",
+    clinic_address: "",
+    clinic_contact: "",
   });
 
   useEffect(() => {
@@ -408,7 +412,6 @@ function Register() {
                   onFocus={e => e.target.style.borderColor = "rgba(59,130,246,0.6)"}
                   onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.12)"}
                 >
-                  <option value="Receptionist">Receptionist</option>
                   <option value="Doctor">Doctor</option>
                   <option value="Lab Staff">Lab Staff</option>
                 </select>
@@ -419,6 +422,101 @@ function Register() {
                 }}>▼</span>
               </div>
             </div>
+
+            {/* Clinic details conditional fields */}
+            {formData.role === "Doctor" && (
+              <div style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 14, padding: 14,
+                display: "flex", flexDirection: "column", gap: 12,
+                marginTop: 4, marginBottom: 4,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#93c5fd" }}>🏥 Clinic Registration</div>
+                
+                {/* Clinic Name */}
+                <div>
+                  <label style={labelStyle}>Clinic / OPD Name *</label>
+                  <div style={{ position: "relative" }}>
+                    <span style={iconStyle}>🏢</span>
+                    <input
+                      type="text" name="clinic_name"
+                      placeholder="e.g. Smile Dental Clinic"
+                      value={formData.clinic_name}
+                      onChange={handleChange}
+                      style={inputStyle}
+                      required={formData.role === "Doctor"}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                {/* Clinic Type */}
+                <div>
+                  <label style={labelStyle}>OPD Type *</label>
+                  <div style={{ position: "relative" }}>
+                    <span style={iconStyle}>🔬</span>
+                    <select
+                      name="clinic_type"
+                      value={formData.clinic_type}
+                      onChange={handleChange}
+                      disabled={loading}
+                      style={{
+                        ...inputStyle, paddingLeft: 40,
+                        appearance: "none", cursor: "pointer",
+                      }}
+                    >
+                      <option value="General">General</option>
+                      <option value="Dental">Dental</option>
+                      <option value="Cardiology">Cardiology</option>
+                      <option value="Orthopedics">Orthopedics</option>
+                      <option value="Neurology">Neurology</option>
+                      <option value="Pediatrics">Pediatrics</option>
+                      <option value="Gynecology">Gynecology</option>
+                      <option value="Dermatology">Dermatology</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <span style={{
+                      position: "absolute", right: 14, top: "50%",
+                      transform: "translateY(-50%)", pointerEvents: "none",
+                      color: "rgba(255,255,255,0.4)", fontSize: 11,
+                    }}>▼</span>
+                  </div>
+                </div>
+
+                {/* Clinic Contact */}
+                <div>
+                  <label style={labelStyle}>Clinic Contact Number</label>
+                  <div style={{ position: "relative" }}>
+                    <span style={iconStyle}>📞</span>
+                    <input
+                      type="text" name="clinic_contact"
+                      placeholder="e.g. +91 98765 43210"
+                      value={formData.clinic_contact}
+                      onChange={handleChange}
+                      style={inputStyle}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                {/* Clinic Address */}
+                <div>
+                  <label style={labelStyle}>Clinic Address</label>
+                  <div style={{ position: "relative" }}>
+                    <span style={iconStyle}>📍</span>
+                    <input
+                      type="text" name="clinic_address"
+                      placeholder="e.g. 123 Main St, New Delhi"
+                      value={formData.clinic_address}
+                      onChange={handleChange}
+                      style={inputStyle}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Password */}
             <div>
