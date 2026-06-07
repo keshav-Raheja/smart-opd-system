@@ -25,14 +25,31 @@ def _opd_filter():
 
 
 def add_patient():
-    data   = request.json
+    data   = request.json or {}
     opd_id = request.user.get("opd_id")
+    name   = data.get("name")
+    phone  = data.get("phone")
+
+    if not name or not phone:
+        return jsonify({"message": "Patient Name and Phone number are required"}), 400
+
+    # Avoid duplicate registrations under the same OPD
+    existing_patient = patients_collection.find_one({
+        "phone": phone,
+        "opd_id": opd_id
+    })
+
+    if existing_patient:
+        return jsonify({
+            "message": "Patient with this phone number already registered.",
+            "patient_id": str(existing_patient["_id"]),
+        }), 200
 
     patient_data = {
-        "name":        data.get("name"),
+        "name":        name,
         "age":         data.get("age"),
         "gender":      data.get("gender"),
-        "phone":       data.get("phone"),
+        "phone":       phone,
         "address":     data.get("address"),
         "blood_group": data.get("blood_group"),
         "opd_id":      opd_id,           # ← tag with creator's OPD
