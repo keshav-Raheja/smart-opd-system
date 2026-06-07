@@ -187,7 +187,7 @@ function PatientProfile() {
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               {/* PDF Button */}
               <a
-                href={`http://127.0.0.1:5000/api/pdf/prescription/${id}`}
+                href={`${api.defaults.baseURL}/pdf/prescription/${id}`}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-success"

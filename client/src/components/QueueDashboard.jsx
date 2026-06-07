@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../services/api";
 
 const STATUS_STYLE = {
   "Scheduled":        { badge: "bg-yellow-100 text-yellow-700", dot: "#f59e0b" },
@@ -15,7 +15,7 @@ const QueueDashboard = () => {
 
   const fetchTodayAppointments = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:5000/api/appointments/today");
+      const response = await api.get("/appointments/today");
       setAppointments(response.data);
     } catch (error) {
       console.error(error);
