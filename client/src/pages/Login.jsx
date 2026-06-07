@@ -48,11 +48,17 @@ function Login() {
     }
   };
 
-  const features = [
-    { icon: "🤖", text: "AI-powered report analysis" },
-    { icon: "📋", text: "Smart appointment management" },
-    { icon: "💊", text: "Digital prescription generation" },
-    { icon: "📊", text: "Real-time dashboard analytics" },
+  const trustHighlights = [
+    { icon: "🛡️", title: "HIPAA-Compliant Safeguards", desc: "Your clinical data is protected with healthcare-grade security protocols." },
+    { icon: "🔒", title: "AES-256 Data Encryption", desc: "All records, prescriptions, and medical files are fully encrypted at rest and in transit." },
+    { icon: "⚡", title: "99.99% Cloud Uptime", desc: "Powered by zero-latency servers ensuring instant records access on any device." },
+    { icon: "👥", title: "Trusted Clinic Network", desc: "Adopted by over 500+ healthcare practitioners and outpatient departments." }
+  ];
+
+  const stats = [
+    { value: "500+", label: "Clinics Enrolled" },
+    { value: "99.99%", label: "System SLA" },
+    { value: "100%", label: "Data Security" }
   ];
 
   return (
@@ -67,84 +73,102 @@ function Login() {
       {/* ── Branding Panel ─────────────────────────────────────────── */}
       <div style={{
         flex: isMobile ? "none" : "0 0 45%",
-        background: "linear-gradient(150deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%)",
+        background: "linear-gradient(150deg, #070b19 0%, #0d1e3d 50%, #1e40af 100%)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: isMobile ? "40px 24px 32px" : "60px 48px",
+        padding: isMobile ? "40px 20px" : "60px 48px",
         position: "relative",
         overflow: "hidden",
         minHeight: isMobile ? "auto" : "100vh",
       }}>
         {/* Ambient blobs */}
         <div style={{
-          position: "absolute", width: 350, height: 350, borderRadius: "50%",
-          background: "rgba(59,130,246,0.15)", top: "-120px", right: "-100px",
-          filter: "blur(60px)", pointerEvents: "none",
+          position: "absolute", width: 450, height: 450, borderRadius: "50%",
+          background: "rgba(59,130,246,0.18)", top: "-180px", right: "-120px",
+          filter: "blur(80px)", pointerEvents: "none",
         }} />
         <div style={{
-          position: "absolute", width: 250, height: 250, borderRadius: "50%",
-          background: "rgba(139,92,246,0.1)", bottom: "-60px", left: "-60px",
-          filter: "blur(40px)", pointerEvents: "none",
+          position: "absolute", width: 350, height: 350, borderRadius: "50%",
+          background: "rgba(139,92,246,0.12)", bottom: "-100px", left: "-80px",
+          filter: "blur(60px)", pointerEvents: "none",
         }} />
 
-        <div style={{ textAlign: "center", position: "relative", zIndex: 1, maxWidth: 380 }}>
-          <div style={{ fontSize: isMobile ? 52 : 72, marginBottom: isMobile ? 12 : 24 }}>🏥</div>
-          <h1 style={{
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: isMobile ? 26 : 36,
-            fontWeight: 800,
-            color: "#ffffff",
-            letterSpacing: "-1px",
-            marginBottom: 10,
-          }}>
-            Smart OPD System
-          </h1>
-          <p style={{
-            fontSize: isMobile ? 13 : 15,
-            color: "rgba(255,255,255,0.65)",
-            lineHeight: 1.7,
-            maxWidth: 300,
-            margin: "0 auto",
-            marginBottom: isMobile ? 0 : 40,
-          }}>
-            AI-powered clinic management with intelligent medical report analysis
-          </p>
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 460, width: "100%" }}>
+          {/* Logo & Headline */}
+          <div style={{ textAlign: "center", marginBottom: isMobile ? 24 : 36 }}>
+            <div style={{ fontSize: isMobile ? 54 : 64, marginBottom: 16, display: "inline-block" }}>🏥</div>
+            <h1 style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: isMobile ? 26 : 34,
+              fontWeight: 800,
+              color: "#ffffff",
+              letterSpacing: "-1px",
+              marginBottom: 10,
+            }}>
+              Smart OPD System
+            </h1>
+            <p style={{
+              fontSize: isMobile ? 13 : 14.5,
+              color: "rgba(255,255,255,0.7)",
+              lineHeight: 1.6,
+              maxWidth: 380,
+              margin: "0 auto",
+            }}>
+              Intelligent clinic management with secure digital prescriptions, AI report analysis, and automated billing workflows.
+            </p>
+          </div>
 
-          {/* Feature list — hide on mobile to save space */}
+          {/* Trust Highlights Grid - Desktop */}
           {!isMobile && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, textAlign: "left", marginTop: 40 }}>
-              {features.map((f, i) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
+              {trustHighlights.map((h, i) => (
                 <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "12px 16px",
-                  background: "rgba(255,255,255,0.07)",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  display: "flex", gap: 14,
+                  padding: "14px 18px",
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  backdropFilter: "blur(10px)",
                 }}>
-                  <span style={{ fontSize: 20 }}>{f.icon}</span>
-                  <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: 500 }}>{f.text}</span>
+                  <span style={{ fontSize: 22, marginTop: 2 }}>{h.icon}</span>
+                  <div>
+                    <div style={{ color: "#ffffff", fontSize: 13.5, fontWeight: 700, marginBottom: 3 }}>
+                      {h.title}
+                    </div>
+                    <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 11.5, lineHeight: 1.45 }}>
+                      {h.desc}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Mobile: show compact feature pills */}
-          {isMobile && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 16 }}>
-              {features.map((f, i) => (
-                <span key={i} style={{
-                  fontSize: 12, padding: "6px 12px",
-                  background: "rgba(255,255,255,0.1)",
-                  borderRadius: 20, color: "rgba(255,255,255,0.8)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}>
-                  {f.icon} {f.text}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Stats Bar */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 12,
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.05)",
+            borderRadius: 16,
+            padding: "14px 10px",
+            textAlign: "center",
+            backdropFilter: "blur(10px)",
+          }}>
+            {stats.map((s, i) => (
+              <div key={i}>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: "#60a5fa", marginBottom: 2 }}>
+                  {s.value}
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

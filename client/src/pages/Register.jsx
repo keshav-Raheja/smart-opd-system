@@ -125,6 +125,12 @@ function Register() {
     { step: "3", title: "Access Clinic Hub", desc: "Prescriptions, queues, and smart billing." },
   ];
 
+  const stats = [
+    { value: "500+", label: "Clinics Enrolled" },
+    { value: "99.99%", label: "System SLA" },
+    { value: "100%", label: "Data Security" }
+  ];
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -137,73 +143,78 @@ function Register() {
       {/* ── Left Branding Panel ──────────────────────────────────── */}
       <div style={{
         flex: isMobile ? "none" : "0 0 42%",
-        background: "linear-gradient(150deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%)",
+        background: "linear-gradient(150deg, #070b19 0%, #0d1e3d 50%, #1e40af 100%)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: isMobile ? "36px 24px 28px" : "60px 48px",
+        padding: isMobile ? "40px 20px" : "60px 48px",
         position: "relative",
         overflow: "hidden",
         minHeight: isMobile ? "auto" : "100vh",
       }}>
         {/* Ambient blobs */}
         <div style={{
-          position: "absolute", width: 400, height: 400, borderRadius: "50%",
-          background: "rgba(59,130,246,0.15)", top: "-150px", left: "-150px",
-          filter: "blur(60px)", pointerEvents: "none",
+          position: "absolute", width: 450, height: 450, borderRadius: "50%",
+          background: "rgba(59,130,246,0.18)", top: "-180px", left: "-120px",
+          filter: "blur(80px)", pointerEvents: "none",
         }} />
         <div style={{
-          position: "absolute", width: 280, height: 280, borderRadius: "50%",
-          background: "rgba(139,92,246,0.1)", bottom: "-80px", right: "-80px",
-          filter: "blur(40px)", pointerEvents: "none",
+          position: "absolute", width: 350, height: 350, borderRadius: "50%",
+          background: "rgba(139,92,246,0.12)", bottom: "-100px", right: "-80px",
+          filter: "blur(60px)", pointerEvents: "none",
         }} />
 
-        <div style={{ textAlign: "center", position: "relative", zIndex: 1, maxWidth: 360 }}>
-          <div style={{ fontSize: isMobile ? 48 : 68, marginBottom: isMobile ? 12 : 20 }}>🏥</div>
-          <h1 style={{
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: isMobile ? 24 : 34,
-            fontWeight: 800,
-            color: "#ffffff",
-            letterSpacing: "-1px",
-            marginBottom: 8,
-          }}>
-            Join Smart OPD
-          </h1>
-          <p style={{
-            fontSize: isMobile ? 13 : 14,
-            color: "rgba(255,255,255,0.65)",
-            lineHeight: 1.65,
-            marginBottom: isMobile ? 0 : 36,
-          }}>
-            Set up your clinical account and access real-time medical analytics & billing.
-          </p>
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 380, width: "100%" }}>
+          <div style={{ textAlign: "center", marginBottom: isMobile ? 24 : 36 }}>
+            <div style={{ fontSize: isMobile ? 54 : 64, marginBottom: 16, display: "inline-block" }}>🏥</div>
+            <h1 style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: isMobile ? 26 : 34,
+              fontWeight: 800,
+              color: "#ffffff",
+              letterSpacing: "-1px",
+              marginBottom: 10,
+            }}>
+              Join Smart OPD
+            </h1>
+            <p style={{
+              fontSize: isMobile ? 13 : 14.5,
+              color: "rgba(255,255,255,0.7)",
+              lineHeight: 1.6,
+              maxWidth: 340,
+              margin: "0 auto",
+            }}>
+              Set up your clinical account and access real-time medical analytics, digital prescriptions & smart billing.
+            </p>
+          </div>
 
           {/* Steps — full on desktop, compact pills on mobile */}
           {!isMobile ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, textAlign: "left", marginTop: 28 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
               {steps.map((s, i) => (
                 <div key={i} style={{
                   display: "flex", gap: 14, padding: "14px 18px",
-                  borderRadius: 14, background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 14, background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  backdropFilter: "blur(10px)",
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: "50%",
-                    background: "rgba(255,255,255,0.15)", color: "white",
+                    background: "rgba(59,130,246,0.2)", color: "#60a5fa",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontWeight: 700, fontSize: 13, flexShrink: 0,
+                    border: "1px solid rgba(59,130,246,0.3)",
                   }}>{s.step}</div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "white", marginBottom: 2 }}>{s.title}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{s.desc}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "white", marginBottom: 2 }}>{s.title}</div>
+                    <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.45 }}>{s.desc}</div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 16 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 16, marginBottom: 24 }}>
               {steps.map((s, i) => (
                 <span key={i} style={{
                   fontSize: 12, padding: "6px 12px",
@@ -216,6 +227,30 @@ function Register() {
               ))}
             </div>
           )}
+
+          {/* Stats Bar */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 12,
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.05)",
+            borderRadius: 16,
+            padding: "14px 10px",
+            textAlign: "center",
+            backdropFilter: "blur(10px)",
+          }}>
+            {stats.map((s, i) => (
+              <div key={i}>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: "#60a5fa", marginBottom: 2 }}>
+                  {s.value}
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
