@@ -14,10 +14,28 @@ import FeeConfig from "../pages/FeeConfig";
 import MyFeeConfig from "../pages/MyFeeConfig";
 import OpdManagement from "../pages/OpdManagement";
 import StaffManagement from "../pages/StaffManagement";
+import Landing from "../pages/Landing";
 import MainLayout from "../layouts/MainLayout";
 
 import { ROLES } from "../config/roles";
 import ProtectedRoute from "./ProtectedRoute";
+
+// Conditionally render Dashboard for authenticated users, otherwise render public Landing page
+const HomeRoute = () => {
+  const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+
+  if (token && user) {
+    return (
+      <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF]}>
+        <MainLayout>
+          <Dashboard />
+        </MainLayout>
+      </ProtectedRoute>
+    );
+  }
+  return <Landing />;
+};
 
 function AppRoutes() {
   return (
@@ -29,17 +47,8 @@ function AppRoutes() {
         <Route path="/register" element={<Register />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Dashboard — Admin & Doctor see full analytics; all roles can access */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF]}>
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
+        {/* Root Route: Serves Dashboard to logged in users, Landing to public */}
+        <Route path="/" element={<HomeRoute />} />
 
         {/* /dashboard alias */}
         <Route
