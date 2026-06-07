@@ -190,6 +190,7 @@ def create_bill():
         "amount_paid":    round(amount_paid, 2),
         "amount_due":     max(amount_due, 0),
         "notes":          data.get("notes", "").strip(),
+        "opd_id":         request.user.get("opd_id"),   # OPD scope tag
         "created_at":     now,
         "updated_at":     now,
     }
@@ -215,7 +216,17 @@ def create_bill():
 # GET /api/billing/                 → list bills
 # ─────────────────────────────────────────────────────────────
 def get_bills():
-    query = {}
+    user   = request.user
+    role   = user.get("role")
+    opd_id = user.get("opd_id")
+
+    # OPD scoping
+    if role == "Admin":
+        query = {}
+    elif opd_id:
+        query = {"opd_id": opd_id}
+    else:
+        query = {"opd_id": "__none__"}
 
     patient_id = request.args.get("patient_id")
     if patient_id:
@@ -225,7 +236,6 @@ def get_bills():
     if status and status in VALID_PAYMENT_STATUSES:
         query["payment_status"] = status
 
-    # Date range (ISO date strings)
     date_from = request.args.get("from")
     date_to   = request.args.get("to")
     if date_from or date_to:

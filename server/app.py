@@ -14,6 +14,7 @@ from routes.appointment_routes import appointment_bp
 from routes.rag_routes import rag_bp
 from routes.billing_routes import billing_bp
 from routes.fee_config_routes import fee_config_bp
+from routes.opd_routes import opd_bp
 
 # ── Seed default fee catalogue on first run ────────────────────────────────────
 from controllers.fee_config_controller import seed_fee_config
@@ -36,6 +37,7 @@ app.register_blueprint(appointment_bp, url_prefix="/api/appointments")
 app.register_blueprint(rag_bp,         url_prefix="/api/rag")
 app.register_blueprint(billing_bp,     url_prefix="/api/billing")
 app.register_blueprint(fee_config_bp,  url_prefix="/api/fee-config")
+app.register_blueprint(opd_bp,         url_prefix="/api/opd")
 
 
 @app.route("/")

@@ -12,6 +12,7 @@ import AIReportSupport from "../pages/AIReportSupport";
 import Billing from "../pages/Billing";
 import FeeConfig from "../pages/FeeConfig";
 import MyFeeConfig from "../pages/MyFeeConfig";
+import OpdManagement from "../pages/OpdManagement";
 import MainLayout from "../layouts/MainLayout";
 
 import { ROLES } from "../config/roles";
@@ -140,6 +141,18 @@ function AppRoutes() {
             <ProtectedRoute allowedRoles={[ROLES.DOCTOR]}>
               <MainLayout>
                 <MyFeeConfig />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* OPD Management — Admin only */}
+        <Route
+          path="/opd-management"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <MainLayout>
+                <OpdManagement />
               </MainLayout>
             </ProtectedRoute>
           }

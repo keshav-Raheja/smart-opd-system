@@ -13,6 +13,7 @@ import { useToast } from "../context/ToastContext";
 import PrescriptionMedicineCard from "./PrescriptionMedicineCard";
 import BillingSection from "./BillingSection";
 import PatientHistoryPanel from "./PatientHistoryPanel";
+import DentalChart from "./DentalChart";
 
 const VITAL_FIELDS = [
   { name: "blood_pressure", label: "Blood Pressure", placeholder: "e.g. 120/80", icon: "🩸", unit: "mmHg" },
@@ -36,6 +37,7 @@ function ConsultationWorkspace({ patient }) {
   const [activeTab,    setActiveTab]    = useState("Consultation");
   const [savedVisitId, setSavedVisitId] = useState(null);
   const [visitCount,   setVisitCount]   = useState(0);  // for header badge
+  const [dentalChart,  setDentalChart]  = useState({});
 
   // Refresh visit count whenever patient changes
   useEffect(() => {
@@ -44,6 +46,7 @@ function ConsultationWorkspace({ patient }) {
     setFormData(EMPTY_FORM);
     setMedicines([]);
     setSavedVisitId(null);
+    setDentalChart({});
 
     // Auto-update appointment status to "In Consultation" if it was "Checked-In"
     if (patient._id && patient.status === "Checked-In") {
@@ -76,13 +79,15 @@ function ConsultationWorkspace({ patient }) {
     }
     setSaving(true);
     try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
       const res = await api.post("/visits/", {
         patient_id:     patient.patient_id,
         patient_name:   patient.patient_name,
         appointment_id: patient._id, // Pass appointment ID to link & auto-complete
-        doctor_name:    JSON.parse(localStorage.getItem("user") || "{}")?.name || "Doctor",
+        doctor_name:    user?.name || "Doctor",
         ...formData,
         prescription:   medicines.filter((m) => m.name.trim()),
+        dental_chart:   dentalChart,
       });
 
       setSavedVisitId(res.data.visit_id || null);
@@ -243,6 +248,18 @@ function ConsultationWorkspace({ patient }) {
                 ))}
               </div>
             </div>
+
+            {/* Dental Chart — only shown for Dental OPDs */}
+            {JSON.parse(localStorage.getItem("user") || "{}")?.opd_type === "Dental" && (
+              <div className="card" style={{ padding: 20, marginTop: 16 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: "var(--text-primary)" }}>Dental Chart</h3>
+                <DentalChart
+                  chart={dentalChart}
+                  onChange={setDentalChart}
+                  toothHistory={patient?.tooth_history || {}}
+                />
+              </div>
+            )}
 
             <div className="divider" />
 

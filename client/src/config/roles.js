@@ -6,55 +6,15 @@ export const ROLES = {
 };
 
 export const ROLE_ACCESS = {
-  dashboard: [
-    ROLES.ADMIN,
-    ROLES.DOCTOR,
-  ],
-
-  doctorPanel: [
-    ROLES.DOCTOR,
-  ],
-
-  patients: [
-    ROLES.ADMIN,
-    ROLES.DOCTOR,
-    ROLES.RECEPTIONIST,
-  ],
-
-  appointments: [
-    ROLES.ADMIN,
-    ROLES.DOCTOR,
-    ROLES.RECEPTIONIST,
-  ],
-
-  uploads: [
-    ROLES.ADMIN,
-    ROLES.DOCTOR,
-    ROLES.LAB_STAFF,
-  ],
-
-  aiSupport: [
-    ROLES.ADMIN,
-    ROLES.DOCTOR,
-    ROLES.LAB_STAFF,
-    ROLES.RECEPTIONIST,
-  ],
-
-  billing: [
-    ROLES.ADMIN,
-    ROLES.DOCTOR,
-    ROLES.RECEPTIONIST,
-  ],
-
-  feeConfig: [
-    ROLES.ADMIN,
-  ],
-
-  myFeeConfig: [
-    ROLES.DOCTOR,
-  ],
-
-  analytics: [
-    ROLES.ADMIN,
-  ],
+  dashboard: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF],
+  doctorPanel: [ROLES.DOCTOR],
+  patients: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST],
+  appointments: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST],
+  uploads: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.LAB_STAFF],
+  aiSupport: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.LAB_STAFF, ROLES.RECEPTIONIST],
+  billing: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST],
+  feeConfig: [ROLES.ADMIN],
+  myFeeConfig: [ROLES.DOCTOR],
+  analytics: [ROLES.ADMIN],
+  opdManagement: [ROLES.ADMIN],   // NEW
 };
