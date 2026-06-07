@@ -9,8 +9,8 @@ _STAFF_MANAGERS = ["Doctor", "Admin"]
 auth_bp.route("/register", methods=["POST"])(register)
 auth_bp.route("/login", methods=["POST"])(login)
 auth_bp.route("/create-receptionist", methods=["POST"])(
-    token_required(role_required(_STAFF_MANAGERS))(create_receptionist)
+    token_required(role_required(_STAFF_MANAGERS)(create_receptionist))
 )
 auth_bp.route("/receptionist/<receptionist_id>", methods=["DELETE"])(
-    token_required(role_required(_STAFF_MANAGERS))(delete_receptionist)
+    token_required(role_required(_STAFF_MANAGERS)(delete_receptionist))
 )
