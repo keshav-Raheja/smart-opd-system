@@ -27,6 +27,7 @@ def create_appointment():
         "doctor_name":       data["doctor_name"],
         "appointment_date":  data["appointment_date"],
         "appointment_time":  data["appointment_time"],
+        "duration":          int(data.get("duration", 15)),
         "status":            "Scheduled",
         "reason":            data.get("reason", ""),
         "opd_id":            opd_id,
@@ -42,6 +43,7 @@ def get_appointments():
     appointments = []
     for a in appointments_collection.find(query).sort("created_at", -1):
         a["_id"] = str(a["_id"])
+        a["duration"] = int(a.get("duration", 15))
         appointments.append(a)
     return jsonify(appointments)
 
@@ -66,5 +68,6 @@ def get_today_appointments():
     appointments = []
     for a in appointments_collection.find(query):
         a["_id"] = str(a["_id"])
+        a["duration"] = int(a.get("duration", 15))
         appointments.append(a)
     return jsonify(appointments)

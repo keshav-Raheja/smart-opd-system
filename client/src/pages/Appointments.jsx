@@ -55,7 +55,117 @@ const Appointments = () => {
     appointment_date: defaultDate,
     appointment_time: defaultTime,
     reason: "",
+    duration: 15,
   });
+  const [customDuration, setCustomDuration] = useState("");
+  const [viewMode, setViewMode] = useState("list"); // "list" | "scheduler"
+  const [schedulerStartDate, setSchedulerStartDate] = useState(new Date());
+  const [selectedApptDetails, setSelectedApptDetails] = useState(null);
+
+  const START_HOUR = 8;
+  const END_HOUR = 20;
+  const HOUR_HEIGHT = 70;
+  const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+
+  const get7Days = (startDate) => {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  };
+
+  const formatDateKey = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const handlePrev7Days = () => {
+    const d = new Date(schedulerStartDate);
+    d.setDate(d.getDate() - 7);
+    setSchedulerStartDate(d);
+  };
+
+  const handleNext7Days = () => {
+    const d = new Date(schedulerStartDate);
+    d.setDate(d.getDate() + 7);
+    setSchedulerStartDate(d);
+  };
+
+  const COLUMN_TINTS = [
+    { bg: "rgba(59, 130, 246, 0.02)", header: "rgba(59, 130, 246, 0.08)", border: "rgba(59, 130, 246, 0.15)" }, // Blue
+    { bg: "rgba(16, 185, 129, 0.02)", header: "rgba(16, 185, 129, 0.08)", border: "rgba(16, 185, 129, 0.15)" }, // Green
+    { bg: "rgba(139, 92, 246, 0.02)", header: "rgba(139, 92, 246, 0.08)", border: "rgba(139, 92, 246, 0.15)" }, // Purple
+    { bg: "rgba(245, 158, 11, 0.02)", header: "rgba(245, 158, 11, 0.08)", border: "rgba(245, 158, 11, 0.15)" }, // Amber
+    { bg: "rgba(236, 72, 153, 0.02)", header: "rgba(236, 72, 153, 0.08)", border: "rgba(236, 72, 153, 0.15)" }, // Pink
+    { bg: "rgba(20, 184, 166, 0.02)", header: "rgba(20, 184, 166, 0.08)", border: "rgba(20, 184, 166, 0.15)" }, // Teal
+    { bg: "rgba(249, 115, 22, 0.02)", header: "rgba(249, 115, 22, 0.08)", border: "rgba(249, 115, 22, 0.15)" }, // Orange
+  ];
+
+  const DOC_THEMES = [
+    { bg: "#eff6ff", color: "#1e40af", border: "#3b82f6" }, // Blue
+    { bg: "#ecfdf5", color: "#065f46", border: "#10b981" }, // Emerald
+    { bg: "#faf5ff", color: "#6b21a8", border: "#8b5cf6" }, // Purple
+    { bg: "#fff7ed", color: "#c2410c", border: "#f97316" }, // Orange
+    { bg: "#fdf2f8", color: "#9d174d", border: "#ec4899" }, // Pink
+    { bg: "#f0fdfa", color: "#0f766e", border: "#14b8a6" }, // Teal
+    { bg: "#fffbeb", color: "#b45309", border: "#f59e0b" }, // Amber
+  ];
+
+  const getDocTheme = (docName) => {
+    if (!docName) return DOC_THEMES[0];
+    let hash = 0;
+    for (let i = 0; i < docName.length; i++) {
+      hash = docName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % DOC_THEMES.length;
+    return DOC_THEMES[idx];
+  };
+
+  const handleToday = () => {
+    setSchedulerStartDate(new Date());
+  };
+
+  const getApptStyle = (appt, dayAppts) => {
+    const [h, m] = appt.appointment_time.split(":").map(Number);
+    const startM = (h - START_HOUR) * 60 + m;
+    const duration = appt.duration || 15;
+    const endM = startM + duration;
+
+    const overlaps = dayAppts.filter(other => {
+      const [oh, om] = other.appointment_time.split(":").map(Number);
+      const oStartM = (oh - START_HOUR) * 60 + om;
+      const oDuration = other.duration || 15;
+      const oEndM = oStartM + oDuration;
+      return oStartM < endM && startM < oEndM;
+    });
+
+    overlaps.sort((a, b) => {
+      if (a.appointment_time !== b.appointment_time) {
+        return a.appointment_time.localeCompare(b.appointment_time);
+      }
+      return a._id.localeCompare(b._id);
+    });
+
+    const idx = overlaps.findIndex(o => o._id === appt._id);
+    const count = overlaps.length || 1;
+
+    const top = startM * (HOUR_HEIGHT / 60);
+    const height = duration * (HOUR_HEIGHT / 60);
+    const width = 100 / count;
+    const left = idx * width;
+
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+      width: `${width}%`,
+      left: `${left}%`,
+    };
+  };
 
   const fetchAppointments = async () => {
     try {
@@ -118,6 +228,10 @@ const Appointments = () => {
 
     // 2. Book the actual Appointment
     try {
+      const finalDuration = formData.duration === "custom" 
+        ? (parseInt(customDuration) || 15) 
+        : (parseInt(formData.duration) || 15);
+
       await api.post("/appointments/", {
         patient_id: targetPatientId,
         patient_name: targetPatientName,
@@ -125,6 +239,7 @@ const Appointments = () => {
         appointment_date: formData.appointment_date,
         appointment_time: formData.appointment_time,
         reason: formData.reason,
+        duration: finalDuration,
       });
 
       toast.success("Appointment Created", `Scheduled for ${targetPatientName}`);
@@ -137,7 +252,9 @@ const Appointments = () => {
         appointment_date: resetDate,
         appointment_time: resetTime,
         reason: "",
+        duration: 15,
       });
+      setCustomDuration("");
       setNewPatientData({ name: "", age: "", gender: "Male", phone: "", address: "", blood_group: "O+" });
       setSelectedPatient(null);
       setSearchQuery("");
@@ -188,14 +305,61 @@ const Appointments = () => {
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="page-header flex-between">
+      <div className="page-header flex-between" style={{ alignItems: "center" }}>
         <div>
           <h1 className="page-title">📅 Appointments</h1>
           <p className="page-subtitle">{appointments.length} total · {counts["Scheduled"] || 0} scheduled</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? "✕ Cancel" : "+ New Appointment"}
-        </button>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {/* View Toggle */}
+          <div style={{
+            display: "inline-flex",
+            background: "var(--color-surface-3)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 2
+          }}>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`btn btn-sm ${viewMode === "list" ? "btn-primary" : ""}`}
+              style={{
+                borderRadius: 6,
+                border: "none",
+                background: viewMode === "list" ? "var(--color-accent)" : "transparent",
+                color: viewMode === "list" ? "#ffffff" : "var(--color-text-secondary)",
+                boxShadow: viewMode === "list" ? "var(--shadow-sm)" : "none",
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              📋 List
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("scheduler")}
+              className={`btn btn-sm ${viewMode === "scheduler" ? "btn-primary" : ""}`}
+              style={{
+                borderRadius: 6,
+                border: "none",
+                background: viewMode === "scheduler" ? "var(--color-accent)" : "transparent",
+                color: viewMode === "scheduler" ? "#ffffff" : "var(--color-text-secondary)",
+                boxShadow: viewMode === "scheduler" ? "var(--shadow-sm)" : "none",
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              📅 Scheduler
+            </button>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? "✕ Cancel" : "+ New Appointment"}
+          </button>
+        </div>
       </div>
 
       {/* Status Summary Cards */}
@@ -426,7 +590,7 @@ const Appointments = () => {
                 🩺 Appointment Schedule & Doctor Assignee
               </label>
               
-              <div className="grid-form-3" style={{ marginBottom: 14 }}>
+              <div className="grid-form-2" style={{ marginBottom: 14 }}>
                 <div className="form-group">
                   <label className="form-label">Doctor Name *</label>
                   <input
@@ -450,6 +614,9 @@ const Appointments = () => {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="grid-form-2" style={{ marginBottom: 14 }}>
                 <div className="form-group">
                   <label className="form-label">Appointment Time *</label>
                   <input
@@ -460,6 +627,36 @@ const Appointments = () => {
                     className="form-input"
                     required
                   />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Duration *</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <select
+                      name="duration"
+                      value={formData.duration}
+                      onChange={handleChange}
+                      className="form-input form-select"
+                      style={{ flex: 1 }}
+                    >
+                      <option value={15}>15 Minutes (Default)</option>
+                      <option value={30}>30 Minutes</option>
+                      <option value={45}>45 Minutes</option>
+                      <option value={60}>60 Minutes</option>
+                      <option value="custom">Custom...</option>
+                    </select>
+                    {formData.duration === "custom" && (
+                      <input
+                        type="number"
+                        placeholder="Mins"
+                        min="1"
+                        value={customDuration}
+                        onChange={(e) => setCustomDuration(e.target.value)}
+                        className="form-input"
+                        style={{ width: "90px" }}
+                        required
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -483,100 +680,493 @@ const Appointments = () => {
         </div>
       )}
 
-      {/* Table */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">
-            {filterStatus === "All" ? "All Appointments" : `${filterStatus} (${filtered.length})`}
-          </h2>
-          {filterStatus !== "All" && (
-            <button className="btn btn-secondary btn-sm" onClick={() => setFilterStatus("All")}>
-              Clear Filter
-            </button>
+      {/* Table / Scheduler View Mode */}
+      {viewMode === "list" ? (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">
+              {filterStatus === "All" ? "All Appointments" : `${filterStatus} (${filtered.length})`}
+            </h2>
+            {filterStatus !== "All" && (
+              <button className="btn btn-secondary btn-sm" onClick={() => setFilterStatus("All")}>
+                Clear Filter
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="card-body">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} style={{ display: "flex", gap: 16, marginBottom: 14, padding: "10px 0", borderBottom: "1px solid var(--color-border-subtle)" }}>
+                  <div className="skeleton" style={{ flex: 2, height: 16, borderRadius: 6 }} />
+                  <div className="skeleton" style={{ flex: 2, height: 16, borderRadius: 6 }} />
+                  <div className="skeleton" style={{ flex: 1, height: 16, borderRadius: 6 }} />
+                  <div className="skeleton" style={{ flex: 1, height: 16, borderRadius: 6 }} />
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-state-icon">📅</span>
+              <div className="empty-state-title">No appointments found</div>
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Patient</th>
+                    <th>Doctor</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Duration</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((appt, i) => {
+                    const style = STATUS_STYLE[appt.status] || STATUS_STYLE.Scheduled;
+                    return (
+                      <tr key={appt._id} className={`animate-fade-in stagger-${Math.min(i+1, 4)}`}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{appt.patient_name}</div>
+                          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>ID: {appt.patient_id}</div>
+                        </td>
+                        <td>Dr. {appt.doctor_name}</td>
+                        <td>
+                          {appt.appointment_date
+                            ? new Date(appt.appointment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                            : appt.appointment_date}
+                        </td>
+                        <td>{appt.appointment_time}</td>
+                        <td>{appt.duration || 15} mins</td>
+                        <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {appt.reason || "—"}
+                        </td>
+                        <td>
+                          <span className={`status-badge ${style.badge}`}>{appt.status}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <select
+                              value={appt.status}
+                              onChange={(e) => updateStatus(appt._id, e.target.value)}
+                              className="form-input form-select"
+                              style={{ padding: "5px 28px 5px 10px", fontSize: 12, height: 34, width: "auto", minWidth: 140 }}
+                            >
+                              {STATUS_FLOW.map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => deleteAppointment(appt._id)}
+                              className="btn btn-danger btn-sm btn-icon"
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
+      ) : (
+        /* 7-Day Visual Timeline Scheduler */
+        <div className="card" style={{ padding: "20px" }}>
+          {/* Navigation Controls */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+            flexWrap: "wrap",
+            gap: 12
+          }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handlePrev7Days}
+                style={{ padding: "6px 12px" }}
+              >
+                ◀ Prev 7 Days
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleToday}
+                style={{ padding: "6px 12px" }}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleNext7Days}
+                style={{ padding: "6px 12px" }}
+              >
+                Next 7 Days ▶
+              </button>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>
+              📅 {get7Days(schedulerStartDate)[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              {" — "}
+              {get7Days(schedulerStartDate)[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </div>
+          </div>
 
-        {loading ? (
-          <div className="card-body">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} style={{ display: "flex", gap: 16, marginBottom: 14, padding: "10px 0", borderBottom: "1px solid var(--color-border-subtle)" }}>
-                <div className="skeleton" style={{ flex: 2, height: 16, borderRadius: 6 }} />
-                <div className="skeleton" style={{ flex: 2, height: 16, borderRadius: 6 }} />
-                <div className="skeleton" style={{ flex: 1, height: 16, borderRadius: 6 }} />
-                <div className="skeleton" style={{ flex: 1, height: 16, borderRadius: 6 }} />
+          {/* Scheduler View Grid */}
+          <div style={{
+            display: "flex",
+            border: "1px solid var(--color-border)",
+            borderRadius: "10px",
+            background: "var(--color-surface)",
+            overflowX: "auto",
+            position: "relative",
+            maxHeight: "600px",
+            overflowY: "auto",
+            boxShadow: "inset 0 1px 3px rgba(0,0,0,0.05)"
+          }}>
+            {/* Time gutter on left */}
+            <div style={{
+              width: "70px",
+              flexShrink: 0,
+              marginTop: "50px",
+              position: "sticky",
+              left: 0,
+              background: "var(--color-surface)",
+              zIndex: 12,
+              borderRight: "1px solid var(--color-border-subtle)"
+            }}>
+              {HOURS.map((hour) => {
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                const ampm = hour >= 12 ? "PM" : "AM";
+                return (
+                  <div
+                    key={hour}
+                    style={{
+                      height: `${HOUR_HEIGHT}px`,
+                      fontSize: "11px",
+                      color: "var(--color-text-muted)",
+                      textAlign: "right",
+                      paddingRight: "10px",
+                      paddingTop: "4px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {`${displayHour}:00 ${ampm}`}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Days columns container */}
+            <div style={{ display: "flex", flex: 1, minWidth: "1050px" }}>
+              {get7Days(schedulerStartDate).map((day, idx) => {
+                const dayKey = formatDateKey(day);
+                const dayAppts = appointments.filter(a => a.appointment_date === dayKey);
+                const isToday = formatDateKey(new Date()) === dayKey;
+                const tint = COLUMN_TINTS[idx % 7];
+
+                return (
+                  <div key={dayKey} style={{ flex: 1, minWidth: "150px", borderRight: "1px solid var(--color-border-subtle)", position: "relative", background: tint.bg }}>
+                    {/* Header */}
+                    <div style={{
+                      height: "50px",
+                      borderBottom: `2px solid ${isToday ? "var(--color-accent)" : tint.border}`,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: isToday ? "rgba(59, 130, 246, 0.12)" : tint.header,
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 10,
+                    }}>
+                      <span style={{ fontSize: "10px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>
+                        {day.toLocaleDateString("en-US", { weekday: "short" })}
+                      </span>
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: isToday ? "var(--color-accent)" : "var(--color-text-primary)" }}>
+                        {day.toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+
+                    {/* Column body with lines and appts */}
+                    <div style={{ position: "relative", height: `${HOURS.length * HOUR_HEIGHT}px` }}>
+                      {/* Grid lines */}
+                      {HOURS.map((hour) => (
+                        <div
+                          key={hour}
+                          style={{
+                            height: `${HOUR_HEIGHT}px`,
+                            borderBottom: "1px solid var(--color-border-subtle)",
+                          }}
+                        />
+                      ))}
+
+                      {/* Appointments in this column */}
+                      {dayAppts.map((appt) => {
+                        const style = getApptStyle(appt, dayAppts);
+                        if (parseFloat(style.top) < 0 || parseFloat(style.top) >= HOURS.length * HOUR_HEIGHT) return null;
+                        const badgeStyle = STATUS_STYLE[appt.status] || STATUS_STYLE.Scheduled;
+                        const docTheme = getDocTheme(appt.doctor_name);
+                        const isShort = (appt.duration || 15) <= 15;
+
+                        return (
+                          <div
+                            key={appt._id}
+                            onClick={() => setSelectedApptDetails(appt)}
+                            style={{
+                              position: "absolute",
+                              top: style.top,
+                              height: style.height,
+                              left: style.left,
+                              width: style.width,
+                              padding: "2px 4px",
+                              zIndex: 2,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div style={{
+                              background: docTheme.bg,
+                              color: docTheme.color,
+                              borderLeft: `5px solid ${badgeStyle.color}`,
+                              borderRadius: "6px",
+                              height: "100%",
+                              padding: isShort ? "0 6px" : "4px 8px",
+                              fontSize: "11px",
+                              overflow: "hidden",
+                              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.06)",
+                              display: "flex",
+                              flexDirection: isShort ? "row" : "column",
+                              alignItems: isShort ? "center" : "stretch",
+                              justifyContent: isShort ? "flex-start" : "space-between",
+                              transition: "all 0.15s ease-in-out",
+                              border: `1px solid ${docTheme.border}33`,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = "scale(1.02)";
+                              e.currentTarget.style.boxShadow = "var(--shadow-md)";
+                              e.currentTarget.parentElement.style.zIndex = 5;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = "none";
+                              e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.06)";
+                              e.currentTarget.parentElement.style.zIndex = 2;
+                            }}
+                            >
+                              {isShort ? (
+                                <div style={{
+                                  fontWeight: 700,
+                                  fontSize: "9.5px",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  width: "100%"
+                                }}>
+                                  👤 {appt.patient_name} ({appt.duration || 15}m) · {appt.appointment_time}
+                                </div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      👤 {appt.patient_name} ({appt.duration || 15}m)
+                                    </div>
+                                    <div style={{ fontSize: "9px", opacity: 0.95, fontWeight: 600 }}>
+                                      Dr. {appt.doctor_name}
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: "9px", opacity: 0.8, fontWeight: 500, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span>🕒 {appt.appointment_time}</span>
+                                    <span style={{
+                                      background: badgeStyle.bg,
+                                      color: badgeStyle.color,
+                                      fontSize: "8px",
+                                      padding: "1px 4px",
+                                      borderRadius: "4px",
+                                      fontWeight: 700,
+                                      border: `1px solid ${badgeStyle.color}33`
+                                    }}>
+                                      {appt.status}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Detail Modal Popover */}
+      {selectedApptDetails && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.6)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+        }}
+        className="animate-fade-in"
+        >
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: "480px",
+            margin: "16px",
+            boxShadow: "var(--shadow-xl)",
+            background: "var(--color-surface)",
+          }}
+          className="card animate-slide-down"
+          >
+            <div className="card-header" style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderBottom: "1px solid var(--color-border)",
+              paddingBottom: "14px",
+            }}>
+              <h3 className="card-title" style={{ fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                📅 Appointment Details
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedApptDetails(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "20px",
+                  color: "var(--color-text-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="card-body" style={{ padding: "20px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* Patient Info */}
+                <div>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Patient</label>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>{selectedApptDetails.patient_name}</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Patient ID: {selectedApptDetails.patient_id}</div>
+                </div>
+
+                {/* Doctor Info */}
+                <div>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Doctor Assigned</label>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)" }}>Dr. {selectedApptDetails.doctor_name}</div>
+                </div>
+
+                {/* Time & Duration */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Date & Time</label>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                      {new Date(selectedApptDetails.appointment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      <br />
+                      🕒 {selectedApptDetails.appointment_time}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Duration</label>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                      ⏱️ {selectedApptDetails.duration || 15} Minutes
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reason */}
+                <div>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Reason for Visit</label>
+                  <div style={{
+                    fontSize: "12px",
+                    color: "var(--color-text-secondary)",
+                    background: "var(--color-surface-2)",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    marginTop: "4px",
+                    border: "1px solid var(--color-border-subtle)"
+                  }}>
+                    {selectedApptDetails.reason || "No reason specified"}
+                  </div>
+                </div>
+
+                {/* Status Selector */}
+                <div>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Update Status</label>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <select
+                      value={selectedApptDetails.status}
+                      onChange={(e) => {
+                        updateStatus(selectedApptDetails._id, e.target.value);
+                        setSelectedApptDetails({ ...selectedApptDetails, status: e.target.value });
+                      }}
+                      className="form-input form-select"
+                      style={{ flex: 1 }}
+                    >
+                      {STATUS_FLOW.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <span className={`status-badge ${(STATUS_STYLE[selectedApptDetails.status] || STATUS_STYLE.Scheduled).badge}`} style={{ padding: "8px 12px", height: "38px", display: "flex", alignItems: "center" }}>
+                      {selectedApptDetails.status}
+                    </span>
+                  </div>
+                </div>
               </div>
-            ))}
+
+              {/* Actions Footer */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: "24px",
+                borderTop: "1px solid var(--color-border)",
+                paddingTop: "16px",
+                gap: 12
+              }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Delete this appointment?")) {
+                      await deleteAppointment(selectedApptDetails._id);
+                      setSelectedApptDetails(null);
+                    }
+                  }}
+                  className="btn btn-danger"
+                  style={{ display: "flex", alignItems: "center", gap: 4 }}
+                >
+                  🗑️ Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedApptDetails(null)}
+                  className="btn btn-secondary"
+                  style={{ minWidth: "100px" }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <span className="empty-state-icon">📅</span>
-            <div className="empty-state-title">No appointments found</div>
-          </div>
-        ) : (
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Patient</th>
-                  <th>Doctor</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((appt, i) => {
-                  const style = STATUS_STYLE[appt.status] || STATUS_STYLE.Scheduled;
-                  return (
-                    <tr key={appt._id} className={`animate-fade-in stagger-${Math.min(i+1, 4)}`}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{appt.patient_name}</div>
-                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>ID: {appt.patient_id}</div>
-                      </td>
-                      <td>Dr. {appt.doctor_name}</td>
-                      <td>
-                        {appt.appointment_date
-                          ? new Date(appt.appointment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                          : appt.appointment_date}
-                      </td>
-                      <td>{appt.appointment_time}</td>
-                      <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {appt.reason || "—"}
-                      </td>
-                      <td>
-                        <span className={`status-badge ${style.badge}`}>{appt.status}</span>
-                      </td>
-                      <td>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <select
-                            value={appt.status}
-                            onChange={(e) => updateStatus(appt._id, e.target.value)}
-                            className="form-input form-select"
-                            style={{ padding: "5px 28px 5px 10px", fontSize: 12, height: 34, width: "auto", minWidth: 140 }}
-                          >
-                            {STATUS_FLOW.map((s) => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => deleteAppointment(appt._id)}
-                            className="btn btn-danger btn-sm btn-icon"
-                            title="Delete"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
