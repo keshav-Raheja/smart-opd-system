@@ -225,6 +225,11 @@ def get_bills():
         query = {}
     elif opd_id:
         query = {"opd_id": opd_id}
+        if role == "Doctor":
+            doctor_name = user.get("name")
+            if doctor_name:
+                import re
+                query["doctor_name"] = {"$regex": re.escape(doctor_name), "$options": "i"}
     else:
         query = {"opd_id": "__none__"}
 
@@ -351,7 +356,25 @@ def get_revenue_stats():
       by_status      – count / revenue grouped by payment_status
       by_month       – last 6 months revenue trend
     """
+    user   = request.user
+    role   = user.get("role")
+    opd_id = user.get("opd_id")
+
+    # Scoping filter
+    if role == "Admin":
+        match_q = {}
+    elif opd_id:
+        match_q = {"opd_id": opd_id}
+        if role == "Doctor":
+            doctor_name = user.get("name")
+            if doctor_name:
+                import re
+                match_q["doctor_name"] = {"$regex": re.escape(doctor_name), "$options": "i"}
+    else:
+        match_q = {"opd_id": "__none__"}
+
     pipeline_totals = [
+        {"$match": match_q},
         {"$group": {
             "_id":            None,
             "total_billed":   {"$sum": "$total_amount"},
@@ -362,6 +385,7 @@ def get_revenue_stats():
     ]
 
     pipeline_by_status = [
+        {"$match": match_q},
         {"$group": {
             "_id":   "$payment_status",
             "count": {"$sum": 1},
@@ -370,6 +394,7 @@ def get_revenue_stats():
     ]
 
     pipeline_by_month = [
+        {"$match": match_q},
         {"$group": {
             "_id": {
                 "year":  {"$year":  "$created_at"},
