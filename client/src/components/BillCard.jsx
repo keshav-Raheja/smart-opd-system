@@ -93,7 +93,7 @@ function PayModal({ bill, onClose, onPaid }) {
               <div className="form-group">
                 <label className="form-label">Amount Received (₹)</label>
                 <input
-                  type="number" min="0" max={bill.total_amount}
+                  type="number" min="0"
                   className="form-input"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}

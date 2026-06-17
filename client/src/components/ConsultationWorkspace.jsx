@@ -79,8 +79,13 @@ function ConsultationWorkspace({ patient }) {
       .catch(() => setVisitCount(0));
   }, [patient]);
 
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "follow_up_duration" ? (parseInt(value) || 15) : value
+    }));
+  };
 
   const addMedicine    = () => setMedicines((p) => [...p, { name: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
   const removeMedicine = (i) => setMedicines((p) => p.filter((_, idx) => idx !== i));

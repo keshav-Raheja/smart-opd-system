@@ -886,7 +886,7 @@ function PatientProfile() {
                           <label className="form-label">⏱️ Duration</label>
                           <select
                             value={editForm.historical_follow_up_duration || 15}
-                            onChange={(e) => setEditForm({ ...editForm, historical_follow_up_duration: e.target.value })}
+                            onChange={(e) => setEditForm({ ...editForm, historical_follow_up_duration: parseInt(e.target.value) || 15 })}
                             className="form-input form-select"
                           >
                             <option value={15}>15 Mins (Default)</option>

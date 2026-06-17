@@ -450,7 +450,7 @@ export default function BillingSection({ patient, visitId, onBillCreated }) {
         <div className="form-group">
           <label className="form-label">Amount Paid (₹)</label>
           <input
-            type="number" min="0" max={total}
+            type="number" min="0"
             className="form-input"
             value={amountPaid}
             onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}

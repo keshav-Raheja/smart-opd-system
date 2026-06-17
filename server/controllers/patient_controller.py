@@ -349,6 +349,7 @@ def update_patient(patient_id):
             db["bills"].insert_one(bill)
 
     # Sync historical follow-up appointment
+    patient_opd_id = patient.get("opd_id") or opd_id
     existing_hist_appt = db["appointments"].find_one({"patient_id": str(patient_id), "reason": "Historical Follow-up"})
     if existing_hist_appt:
         if is_historical and historical_follow_up_date:
@@ -360,6 +361,8 @@ def update_patient(patient_id):
                     "appointment_time":  historical_follow_up_time,
                     "duration":          historical_follow_up_duration,
                     "doctor_name":       request.user.get("name", "Doctor"),
+                    "status":            "Scheduled",
+                    "opd_id":            patient_opd_id,
                 }}
             )
         else:
@@ -375,7 +378,7 @@ def update_patient(patient_id):
                 "duration":          historical_follow_up_duration,
                 "status":            "Scheduled",
                 "reason":            "Historical Follow-up",
-                "opd_id":            opd_id,
+                "opd_id":            patient_opd_id,
                 "created_at":        datetime.datetime.utcnow(),
             }
             db["appointments"].insert_one(appt)

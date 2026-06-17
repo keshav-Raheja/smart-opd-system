@@ -338,11 +338,11 @@ function AddPatientForm({ fetchPatients, onSuccess }) {
                     </div>
                     <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
                       <label className="form-label">⏱️ Duration</label>
-                      <select
-                        value={historicalForm.historical_follow_up_duration || 15}
-                        onChange={(e) => setHistoricalForm({ ...historicalForm, historical_follow_up_duration: e.target.value })}
-                        className="form-input form-select"
-                      >
+                    <select
+                      value={historicalForm.historical_follow_up_duration || 15}
+                      onChange={(e) => setHistoricalForm({ ...historicalForm, historical_follow_up_duration: parseInt(e.target.value) || 15 })}
+                      className="form-input form-select"
+                    >
                         <option value={15}>15 Mins (Default)</option>
                         <option value={30}>30 Mins</option>
                         <option value={45}>45 Mins</option>
