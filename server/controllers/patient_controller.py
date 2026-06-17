@@ -67,12 +67,15 @@ def add_patient():
         "historical_medicines": data.get("historical_medicines", "") if is_historical else "",
         "historical_paid_amount": data.get("historical_paid_amount", 0) if is_historical else 0,
         "historical_dental_chart": data.get("historical_dental_chart", {}) if is_historical else {},
+        "historical_follow_up_date": data.get("historical_follow_up_date", "") if is_historical else "",
+        "historical_follow_up_time": data.get("historical_follow_up_time", "") if is_historical else "",
+        "historical_follow_up_duration": int(data.get("historical_follow_up_duration", 15)) if is_historical else 15,
     }
 
     result = patients_collection.insert_one(patient_data)
     patient_id = result.inserted_id
 
-    # If it is a historical record, populate visits and bills
+    # If it is a historical record, populate visits, bills, and appointments
     if is_historical:
         visit = {
             "patient_id":     str(patient_id),
@@ -118,6 +121,28 @@ def add_patient():
                 "created_at":     datetime.datetime.utcnow() - datetime.timedelta(seconds=5)
             }
             db["bills"].insert_one(bill)
+
+        hist_follow_up_date = data.get("historical_follow_up_date")
+        if hist_follow_up_date:
+            hist_follow_up_time = data.get("historical_follow_up_time", "")
+            try:
+                hist_follow_up_duration = int(data.get("historical_follow_up_duration", 15))
+            except (ValueError, TypeError):
+                hist_follow_up_duration = 15
+
+            appt = {
+                "patient_id":        str(patient_id),
+                "patient_name":      name,
+                "doctor_name":       request.user.get("name", "Doctor"),
+                "appointment_date":  hist_follow_up_date,
+                "appointment_time":  hist_follow_up_time,
+                "duration":          hist_follow_up_duration,
+                "status":            "Scheduled",
+                "reason":            "Historical Follow-up",
+                "opd_id":            opd_id,
+                "created_at":        datetime.datetime.utcnow(),
+            }
+            db["appointments"].insert_one(appt)
 
     return jsonify({
         "message":    "Patient added successfully",
@@ -192,6 +217,9 @@ def update_patient(patient_id):
     historical_diagnosis = ""
     historical_medicines = ""
     historical_dental_chart = {}
+    historical_follow_up_date = ""
+    historical_follow_up_time = ""
+    historical_follow_up_duration = 15
 
     if is_historical:
         try:
@@ -205,6 +233,12 @@ def update_patient(patient_id):
         historical_diagnosis = data.get("historical_diagnosis", "")
         historical_medicines = data.get("historical_medicines", "")
         historical_dental_chart = data.get("historical_dental_chart", {})
+        historical_follow_up_date = data.get("historical_follow_up_date", "")
+        historical_follow_up_time = data.get("historical_follow_up_time", "")
+        try:
+            historical_follow_up_duration = int(data.get("historical_follow_up_duration", 15))
+        except (ValueError, TypeError):
+            historical_follow_up_duration = 15
 
     # Update patient record
     patients_collection.update_one(
@@ -221,6 +255,9 @@ def update_patient(patient_id):
             "historical_medicines": historical_medicines,
             "historical_paid_amount": historical_paid_amount,
             "historical_dental_chart": historical_dental_chart,
+            "historical_follow_up_date": historical_follow_up_date,
+            "historical_follow_up_time": historical_follow_up_time,
+            "historical_follow_up_duration": historical_follow_up_duration,
         }}
     )
 
@@ -310,6 +347,38 @@ def update_patient(patient_id):
                 "created_at":     datetime.datetime.utcnow() - datetime.timedelta(seconds=5)
             }
             db["bills"].insert_one(bill)
+
+    # Sync historical follow-up appointment
+    existing_hist_appt = db["appointments"].find_one({"patient_id": str(patient_id), "reason": "Historical Follow-up"})
+    if existing_hist_appt:
+        if is_historical and historical_follow_up_date:
+            db["appointments"].update_one(
+                {"_id": existing_hist_appt["_id"]},
+                {"$set": {
+                    "patient_name":      name,
+                    "appointment_date":  historical_follow_up_date,
+                    "appointment_time":  historical_follow_up_time,
+                    "duration":          historical_follow_up_duration,
+                    "doctor_name":       request.user.get("name", "Doctor"),
+                }}
+            )
+        else:
+            db["appointments"].delete_one({"_id": existing_hist_appt["_id"]})
+    else:
+        if is_historical and historical_follow_up_date:
+            appt = {
+                "patient_id":        str(patient_id),
+                "patient_name":      name,
+                "doctor_name":       request.user.get("name", "Doctor"),
+                "appointment_date":  historical_follow_up_date,
+                "appointment_time":  historical_follow_up_time,
+                "duration":          historical_follow_up_duration,
+                "status":            "Scheduled",
+                "reason":            "Historical Follow-up",
+                "opd_id":            opd_id,
+                "created_at":        datetime.datetime.utcnow(),
+            }
+            db["appointments"].insert_one(appt)
 
     return jsonify({"message": "Patient details updated successfully"}), 200
 

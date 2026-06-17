@@ -16,6 +16,9 @@ function AddPatientForm({ fetchPatients, onSuccess }) {
     historical_paid_amount: "",
     historical_diagnosis: "",
     historical_medicines: "",
+    historical_follow_up_date: "",
+    historical_follow_up_time: "",
+    historical_follow_up_duration: 15,
   });
 
   const [diagSuggestions, setDiagSuggestions] = useState([]);
@@ -84,6 +87,9 @@ function AddPatientForm({ fetchPatients, onSuccess }) {
         historical_diagnosis: historicalForm.historical_diagnosis,
         historical_medicines: historicalForm.historical_medicines,
         historical_dental_chart: historicalDentalChart,
+        historical_follow_up_date: historicalForm.historical_follow_up_date,
+        historical_follow_up_time: historicalForm.historical_follow_up_time,
+        historical_follow_up_duration: parseInt(historicalForm.historical_follow_up_duration) || 15,
       } : {})
     };
 
@@ -91,7 +97,15 @@ function AddPatientForm({ fetchPatients, onSuccess }) {
       await api.post("/patients/", payload);
       toast.success("Patient Added", `${formData.name} has been registered`);
       setFormData({ name: "", age: "", gender: "", phone: "", address: "", blood_group: "" });
-      setHistoricalForm({ historical_visits: "", historical_paid_amount: "", historical_diagnosis: "", historical_medicines: "" });
+      setHistoricalForm({
+        historical_visits: "",
+        historical_paid_amount: "",
+        historical_diagnosis: "",
+        historical_medicines: "",
+        historical_follow_up_date: "",
+        historical_follow_up_time: "",
+        historical_follow_up_duration: 15,
+      });
       setHistoricalDentalChart({});
       setIsHistorical(false);
       fetchPatients();
@@ -295,6 +309,45 @@ function AddPatientForm({ fetchPatients, onSuccess }) {
                           )}
                         </div>
                       ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Historical Follow-up Appointment Configuration */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", width: "100%", marginBottom: 12 }}>
+                <div className="form-group" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
+                  <label className="form-label">📅 Future Follow-up Date</label>
+                  <input
+                    type="date"
+                    value={historicalForm.historical_follow_up_date || ""}
+                    onChange={(e) => setHistoricalForm({ ...historicalForm, historical_follow_up_date: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                {historicalForm.historical_follow_up_date && (
+                  <>
+                    <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
+                      <label className="form-label">🕒 Follow-up Time</label>
+                      <input
+                        type="time"
+                        value={historicalForm.historical_follow_up_time || ""}
+                        onChange={(e) => setHistoricalForm({ ...historicalForm, historical_follow_up_time: e.target.value })}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
+                      <label className="form-label">⏱️ Duration</label>
+                      <select
+                        value={historicalForm.historical_follow_up_duration || 15}
+                        onChange={(e) => setHistoricalForm({ ...historicalForm, historical_follow_up_duration: e.target.value })}
+                        className="form-input form-select"
+                      >
+                        <option value={15}>15 Mins (Default)</option>
+                        <option value={30}>30 Mins</option>
+                        <option value={45}>45 Mins</option>
+                        <option value={60}>60 Mins</option>
+                      </select>
                     </div>
                   </>
                 )}

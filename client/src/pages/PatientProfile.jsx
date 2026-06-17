@@ -38,6 +38,9 @@ function PatientProfile() {
     historical_paid_amount: "",
     historical_diagnosis: "",
     historical_medicines: "",
+    historical_follow_up_date: "",
+    historical_follow_up_time: "",
+    historical_follow_up_duration: 15,
   });
   const [editDentalChart, setEditDentalChart] = useState({});
   const [diagSuggestions, setDiagSuggestions] = useState([]);
@@ -46,7 +49,7 @@ function PatientProfile() {
   const [showMedSuggestions, setShowMedSuggestions] = useState(false);
 
   const startEditing = () => {
-    const hasHistory = !!(patient.historical_visits || patient.historical_diagnosis || patient.historical_medicines || patient.historical_paid_amount || Object.keys(patient.historical_dental_chart || {}).length > 0);
+    const hasHistory = !!(patient.historical_visits || patient.historical_diagnosis || patient.historical_medicines || patient.historical_paid_amount || patient.historical_follow_up_date || Object.keys(patient.historical_dental_chart || {}).length > 0);
     setEditForm({
       name: patient.name || "",
       age: patient.age || "",
@@ -59,6 +62,9 @@ function PatientProfile() {
       historical_paid_amount: patient.historical_paid_amount || "",
       historical_diagnosis: patient.historical_diagnosis || "",
       historical_medicines: patient.historical_medicines || "",
+      historical_follow_up_date: patient.historical_follow_up_date || "",
+      historical_follow_up_time: patient.historical_follow_up_time || "",
+      historical_follow_up_duration: patient.historical_follow_up_duration || 15,
     });
     setEditDentalChart(patient.historical_dental_chart || {});
     setIsEditing(true);
@@ -122,6 +128,9 @@ function PatientProfile() {
           historical_diagnosis: editForm.historical_diagnosis,
           historical_medicines: editForm.historical_medicines,
           historical_dental_chart: editDentalChart,
+          historical_follow_up_date: editForm.historical_follow_up_date,
+          historical_follow_up_time: editForm.historical_follow_up_time,
+          historical_follow_up_duration: parseInt(editForm.historical_follow_up_duration) || 15,
         } : {})
       };
 
@@ -846,6 +855,45 @@ function PatientProfile() {
                               )}
                             </div>
                           ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Historical Follow-up Appointment Configuration */}
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", width: "100%", marginBottom: 12 }}>
+                    <div className="form-group" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
+                      <label className="form-label">📅 Future Follow-up Date</label>
+                      <input
+                        type="date"
+                        value={editForm.historical_follow_up_date || ""}
+                        onChange={(e) => setEditForm({ ...editForm, historical_follow_up_date: e.target.value })}
+                        className="form-input"
+                      />
+                    </div>
+                    {editForm.historical_follow_up_date && (
+                      <>
+                        <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
+                          <label className="form-label">🕒 Follow-up Time</label>
+                          <input
+                            type="time"
+                            value={editForm.historical_follow_up_time || ""}
+                            onChange={(e) => setEditForm({ ...editForm, historical_follow_up_time: e.target.value })}
+                            className="form-input"
+                          />
+                        </div>
+                        <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
+                          <label className="form-label">⏱️ Duration</label>
+                          <select
+                            value={editForm.historical_follow_up_duration || 15}
+                            onChange={(e) => setEditForm({ ...editForm, historical_follow_up_duration: e.target.value })}
+                            className="form-input form-select"
+                          >
+                            <option value={15}>15 Mins (Default)</option>
+                            <option value={30}>30 Mins</option>
+                            <option value={45}>45 Mins</option>
+                            <option value={60}>60 Mins</option>
+                          </select>
                         </div>
                       </>
                     )}
