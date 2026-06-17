@@ -25,7 +25,7 @@ const VITAL_FIELDS = [
 const EMPTY_FORM = {
   symptoms: "", diagnosis: "", notes: "",
   blood_pressure: "", temperature: "", pulse: "", weight: "",
-  follow_up_date: "",
+  follow_up_date: "", follow_up_time: "", follow_up_duration: 15,
 };
 
 function ConsultationWorkspace({ patient }) {
@@ -33,6 +33,26 @@ function ConsultationWorkspace({ patient }) {
 
   const [formData,     setFormData]     = useState(EMPTY_FORM);
   const [medicines,    setMedicines]    = useState([]);
+  const [diagnosisSuggestions, setDiagnosisSuggestions] = useState([]);
+  const [showDiagSuggestions, setShowDiagSuggestions] = useState(false);
+
+  const handleDiagnosisChange = async (e) => {
+    const value = e.target.value;
+    setFormData((prev) => ({ ...prev, diagnosis: value }));
+    
+    if (value.trim().length < 2) {
+      setDiagnosisSuggestions([]);
+      return;
+    }
+    
+    try {
+      const response = await api.get(`/visits/diagnoses/search?query=${value}`);
+      setDiagnosisSuggestions(response.data);
+      setShowDiagSuggestions(true);
+    } catch (err) {
+      console.error("Error fetching diagnosis autocompletes", err);
+    }
+  };
   const [saving,       setSaving]       = useState(false);
   const [activeTab,    setActiveTab]    = useState("Consultation");
   const [savedVisitId, setSavedVisitId] = useState(null);
@@ -282,16 +302,50 @@ function ConsultationWorkspace({ patient }) {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-group" style={{ position: "relative" }}>
                 <label className="form-label">Diagnosis</label>
                 <input
                   type="text"
                   name="diagnosis"
                   placeholder="Primary diagnosis…"
-                  value={formData.diagnosis}
-                  onChange={handleChange}
+                  value={formData.diagnosis || ""}
+                  onChange={handleDiagnosisChange}
+                  onFocus={() => { if (diagnosisSuggestions.length > 0) setShowDiagSuggestions(true); }}
                   className="form-input"
+                  autoComplete="off"
                 />
+                {showDiagSuggestions && diagnosisSuggestions.length > 0 && (
+                  <>
+                    <div
+                      style={{ position: "fixed", inset: 0, zIndex: 999 }}
+                      onClick={() => setShowDiagSuggestions(false)}
+                    />
+                    <div style={{
+                      position: "absolute", top: "100%", left: 0, right: 0, zIndex: 1000,
+                      background: "white", border: "1px solid var(--color-border)",
+                      borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      maxHeight: 180, overflowY: "auto", marginTop: 4, padding: 4
+                    }}>
+                      {diagnosisSuggestions.map((diag) => (
+                        <div
+                          key={diag}
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, diagnosis: diag }));
+                            setShowDiagSuggestions(false);
+                          }}
+                          style={{
+                            padding: "8px 12px", cursor: "pointer", borderRadius: 6,
+                            fontSize: 13, color: "var(--color-text-primary)"
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                        >
+                          {diag}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="form-group">
@@ -344,17 +398,46 @@ function ConsultationWorkspace({ patient }) {
               )}
             </div>
 
-            {/* Follow-up Date */}
-            <div className="form-group">
-              <label className="form-label">📅 Follow-up Date</label>
-              <input
-                type="date"
-                name="follow_up_date"
-                value={formData.follow_up_date}
-                onChange={handleChange}
-                className="form-input"
-                style={{ maxWidth: 220 }}
-              />
+            {/* Follow-up Date, Time, and Duration */}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", width: "100%" }}>
+              <div className="form-group" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
+                <label className="form-label">📅 Follow-up Date</label>
+                <input
+                  type="date"
+                  name="follow_up_date"
+                  value={formData.follow_up_date || ""}
+                  onChange={handleChange}
+                  className="form-input"
+                />
+              </div>
+              {formData.follow_up_date && (
+                <>
+                  <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
+                    <label className="form-label">🕒 Follow-up Time</label>
+                    <input
+                      type="time"
+                      name="follow_up_time"
+                      value={formData.follow_up_time || ""}
+                      onChange={handleChange}
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 140, maxWidth: 180 }}>
+                    <label className="form-label">⏱️ Duration</label>
+                    <select
+                      name="follow_up_duration"
+                      value={formData.follow_up_duration || 15}
+                      onChange={handleChange}
+                      className="form-input form-select"
+                    >
+                      <option value={15}>15 Mins (Default)</option>
+                      <option value={30}>30 Mins</option>
+                      <option value={45}>45 Mins</option>
+                      <option value={60}>60 Mins</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Save Button */}

@@ -303,130 +303,172 @@ def generate_prescription_pdf(patient_id):
     if not visits:
         elements.append(Paragraph("No visit records found.", styles["body"]))
     else:
-        for i, visit in enumerate(visits):
-            visit_date = visit.get("created_at", "")
-            if hasattr(visit_date, "strftime"):
-                visit_date = visit_date.strftime("%d %B %Y")
-
-            visit_block = []
-
-            # Visit Header Banner
-            visit_block.append(Paragraph(
-                f"VISIT #{i + 1} — {visit_date}  |  "
-                f"Practitioner: Dr. {visit.get('doctor_name', 'N/A')}",
-                styles["section"]
-            ))
-            visit_block.append(HRFlowable(width="100%", thickness=0.5, color=C_BORDER, spaceBefore=2, spaceAfter=6))
-
-            # Vitals
-            vitals = visit.get("vitals") or {}
-            if any(vitals.values()):
-                bp = vitals.get("blood_pressure") or "—"
-                temp = vitals.get("temperature") or "—"
-                pulse = vitals.get("pulse") or "—"
-                weight = vitals.get("weight") or "—"
-                
-                v_data = [
-                    [
-                        Paragraph(f"🩸 <b>Blood Pressure</b><br/><font size='9.5'><b>{bp}</b></font> <font size='7'>mmHg</font>", styles["body"]),
-                        Paragraph(f"🌡️ <b>Temperature</b><br/><font size='9.5'><b>{temp}</b></font> <font size='7'>°F</font>", styles["body"]),
-                        Paragraph(f"💓 <b>Pulse Rate</b><br/><font size='9.5'><b>{pulse}</b></font> <font size='7'>bpm</font>", styles["body"]),
-                        Paragraph(f"⚖️ <b>Weight</b><br/><font size='9.5'><b>{weight}</b></font> <font size='7'>kg</font>", styles["body"]),
-                    ]
-                ]
-                vt = Table(v_data, colWidths=[1.875*inch] * 4)
-                vt.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, -1), C_BG_LIGHT),
-                    ("BOX",        (0, 0), (-1, -1), 0.5, C_BORDER),
-                    ("INNERGRID",  (0, 0), (-1, -1), 0.5, C_BORDER),
-                    ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
-                    ("VALIGN",     (0, 0), (-1, -1), "MIDDLE"),
-                    ("PADDING",    (0, 0), (-1, -1), 6),
-                ]))
-                visit_block.append(vt)
-                visit_block.append(Spacer(1, 8))
-
-            # Clinical details (Symptoms, Diagnosis, Notes) styled as clean left-highlighted cards
-            clinical_details = []
-            if visit.get("symptoms"):
-                clinical_details.append(("Chief Complaint / Symptoms", visit["symptoms"]))
-            if visit.get("diagnosis"):
-                clinical_details.append(("Diagnosis", visit["diagnosis"]))
-            if visit.get("notes"):
-                clinical_details.append(("Clinical Notes", visit["notes"]))
-            if visit.get("follow_up_date"):
-                clinical_details.append(("Follow-up Date", f"Please visit again on or before: <b>{visit['follow_up_date']}</b>"))
-                
-            for label, val in clinical_details:
-                visit_block.append(_info_card(label, val, styles))
-                visit_block.append(Spacer(1, 6))
-
-            # ── Dental Chart (only if present) ──────────────────────────
-            dental_chart = visit.get("dental_chart") or {}
-            chart_elements = _dental_chart_table(dental_chart, styles)
-            if chart_elements:
-                visit_block.extend(chart_elements)
-                visit_block.append(Spacer(1, 8))
-
-            # ── Medications ℞ Table ──────────────────────────────────────────
-            medicines = visit.get("prescription") or []
-            if medicines:
-                visit_block.append(Paragraph("<b>℞ Prescribed Medications</b>", styles["section"]))
-                visit_block.append(Spacer(1, 4))
-                
-                # Table Headers
-                med_data = [[
-                    Paragraph("<b>Medicine Name</b>", ParagraphStyle("th", parent=styles["body_bold"], textColor=C_WHITE)),
-                    Paragraph("<b>Dosage</b>", ParagraphStyle("thc", parent=styles["body_bold"], textColor=C_WHITE, alignment=1)),
-                    Paragraph("<b>Frequency</b>", ParagraphStyle("thc", parent=styles["body_bold"], textColor=C_WHITE, alignment=1)),
-                    Paragraph("<b>Duration</b>", ParagraphStyle("thc", parent=styles["body_bold"], textColor=C_WHITE, alignment=1)),
-                    Paragraph("<b>Instructions</b>", ParagraphStyle("th", parent=styles["body_bold"], textColor=C_WHITE)),
-                ]]
-                
-                # Table Rows
-                for med in medicines:
-                    med_data.append([
-                        Paragraph(f"<b>{med.get('name', '—')}</b>", styles["body"]),
-                        Paragraph(med.get("dosage", "—"), ParagraphStyle("tdc", parent=styles["body"], alignment=1)),
-                        Paragraph(med.get("frequency", "—"), ParagraphStyle("tdc", parent=styles["body"], alignment=1)),
-                        Paragraph(med.get("duration", "—"), ParagraphStyle("tdc", parent=styles["body"], alignment=1)),
-                        Paragraph(med.get("instructions", "—"), styles["body"]),
-                    ])
-                    
-                med_table = Table(
-                    med_data,
-                    colWidths=[2.3*inch, 0.95*inch, 1.25*inch, 0.95*inch, 2.05*inch]
-                )
-                med_table.setStyle(TableStyle([
-                    ("BACKGROUND",   (0, 0), (-1, 0), C_SECONDARY),
-                    ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
-                    ("PADDING",      (0, 0), (-1, -1), 6),
-                    ("BOX",          (0, 0), (-1, -1), 0.5, C_BORDER),
-                    ("INNERGRID",    (0, 0), (-1, -1), 0.3, C_BORDER),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C_WHITE, C_BG_LIGHT]),
-                ]))
-                visit_block.append(med_table)
-                visit_block.append(Spacer(1, 10))
-
-            # Authorized Signature block with signature line
-            sig_lines = [
-                f"<b>Dr. {visit.get('doctor_name', '')}</b>",
-                "Authorized Signature / Stamp",
-                f"<font size='7' color='#64748b'>Prescribed on: {visit_date}</font>"
-            ]
-            sig_para = Paragraph("<br/>".join(sig_lines), ParagraphStyle("sig", parent=styles["body"], alignment=2, leading=12))
+        latest_visit = visits[0]
+        
+        # Calculate visit number
+        non_historical_visits_count = len([v for v in visits if not v.get("is_historical")])
+        historical_visits = int(patient.get("historical_visits", 0))
+        if latest_visit.get("is_historical"):
+            visit_num = max(1, historical_visits)
+        else:
+            visit_num = non_historical_visits_count + historical_visits
             
-            sig_table = Table([["", sig_para]], colWidths=[5.0*inch, 2.5*inch])
-            sig_table.setStyle(TableStyle([
-                ("VALIGN",   (0, 0), (-1, -1), "TOP"),
-                ("PADDING",  (0, 0), (-1, -1), 0),
-                ("LINEABOVE", (1, 0), (1, 0), 0.5, C_TEXT_MUTED),
-            ]))
-            visit_block.append(Spacer(1, 16))
-            visit_block.append(sig_table)
-            visit_block.append(Spacer(1, 16))
+        visit_date = latest_visit.get("created_at", "")
+        if hasattr(visit_date, "strftime"):
+            visit_date = visit_date.strftime("%d %B %Y")
 
-            elements.append(KeepTogether(visit_block))
+        visit_block = []
+
+        # Visit Header Banner
+        visit_block.append(Paragraph(
+            f"VISIT #{visit_num} — {visit_date}  |  "
+            f"Practitioner: Dr. {latest_visit.get('doctor_name', 'N/A')}",
+            styles["section"]
+        ))
+        visit_block.append(HRFlowable(width="100%", thickness=0.5, color=C_BORDER, spaceBefore=2, spaceAfter=6))
+
+        # Vitals
+        vitals = latest_visit.get("vitals") or {}
+        if any(vitals.values()):
+            bp = vitals.get("blood_pressure") or "—"
+            temp = vitals.get("temperature") or "—"
+            pulse = vitals.get("pulse") or "—"
+            weight = vitals.get("weight") or "—"
+            
+            v_data = [
+                [
+                    Paragraph(f"🩸 <b>Blood Pressure</b><br/><font size='9.5'><b>{bp}</b></font> <font size='7'>mmHg</font>", styles["body"]),
+                    Paragraph(f"🌡️ <b>Temperature</b><br/><font size='9.5'><b>{temp}</b></font> <font size='7'>°F</font>", styles["body"]),
+                    Paragraph(f"💓 <b>Pulse Rate</b><br/><font size='9.5'><b>{pulse}</b></font> <font size='7'>bpm</font>", styles["body"]),
+                    Paragraph(f"⚖️ <b>Weight</b><br/><font size='9.5'><b>{weight}</b></font> <font size='7'>kg</font>", styles["body"]),
+                ]
+            ]
+            vt = Table(v_data, colWidths=[1.875*inch] * 4)
+            vt.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), C_BG_LIGHT),
+                ("BOX",        (0, 0), (-1, -1), 0.5, C_BORDER),
+                ("INNERGRID",  (0, 0), (-1, -1), 0.5, C_BORDER),
+                ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN",     (0, 0), (-1, -1), "MIDDLE"),
+                ("PADDING",    (0, 0), (-1, -1), 6),
+            ]))
+            visit_block.append(vt)
+            visit_block.append(Spacer(1, 8))
+
+        # Clinical details (Chief Complaint / Symptoms, Diagnosis, Notes)
+        clinical_details = []
+        if latest_visit.get("symptoms"):
+            clinical_details.append(("Chief Complaint / Symptoms", latest_visit["symptoms"]))
+        if latest_visit.get("diagnosis"):
+            clinical_details.append(("Diagnosis", latest_visit["diagnosis"]))
+        if latest_visit.get("notes"):
+            clinical_details.append(("Clinical Notes", latest_visit["notes"]))
+        if latest_visit.get("follow_up_date"):
+            clinical_details.append(("Follow-up Date", f"Please visit again on or before: <b>{latest_visit['follow_up_date']}</b>"))
+            
+        for label, val in clinical_details:
+            visit_block.append(_info_card(label, val, styles))
+            visit_block.append(Spacer(1, 6))
+
+        # Dental Chart (only if present)
+        dental_chart = latest_visit.get("dental_chart") or {}
+        chart_elements = _dental_chart_table(dental_chart, styles)
+        if chart_elements:
+            visit_block.extend(chart_elements)
+            visit_block.append(Spacer(1, 8))
+
+        # Medications
+        medicines = latest_visit.get("prescription") or []
+        if medicines:
+            visit_block.append(Paragraph("<b>℞ Prescribed Medications</b>", styles["section"]))
+            visit_block.append(Spacer(1, 4))
+            
+            med_data = [[
+                Paragraph("<b>Medicine Name</b>", ParagraphStyle("th", parent=styles["body_bold"], textColor=C_WHITE)),
+                Paragraph("<b>Dosage</b>", ParagraphStyle("thc", parent=styles["body_bold"], textColor=C_WHITE, alignment=1)),
+                Paragraph("<b>Frequency</b>", ParagraphStyle("thc", parent=styles["body_bold"], textColor=C_WHITE, alignment=1)),
+                Paragraph("<b>Duration</b>", ParagraphStyle("thc", parent=styles["body_bold"], textColor=C_WHITE, alignment=1)),
+                Paragraph("<b>Instructions</b>", ParagraphStyle("th", parent=styles["body_bold"], textColor=C_WHITE)),
+            ]]
+            
+            for med in medicines:
+                med_data.append([
+                    Paragraph(f"<b>{med.get('name', '—')}</b>", styles["body"]),
+                    Paragraph(med.get("dosage", "—"), ParagraphStyle("tdc", parent=styles["body"], alignment=1)),
+                    Paragraph(med.get("frequency", "—"), ParagraphStyle("tdc", parent=styles["body"], alignment=1)),
+                    Paragraph(med.get("duration", "—"), ParagraphStyle("tdc", parent=styles["body"], alignment=1)),
+                    Paragraph(med.get("instructions", "—"), styles["body"]),
+                ])
+                
+            med_table = Table(
+                med_data,
+                colWidths=[2.3*inch, 0.95*inch, 1.25*inch, 0.95*inch, 2.05*inch]
+            )
+            med_table.setStyle(TableStyle([
+                ("BACKGROUND",   (0, 0), (-1, 0), C_SECONDARY),
+                ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+                ("PADDING",      (0, 0), (-1, -1), 6),
+                ("BOX",          (0, 0), (-1, -1), 0.5, C_BORDER),
+                ("INNERGRID",    (0, 0), (-1, -1), 0.3, C_BORDER),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C_WHITE, C_BG_LIGHT]),
+            ]))
+            visit_block.append(med_table)
+            visit_block.append(Spacer(1, 10))
+
+        # Authorized Signature block
+        sig_lines = [
+            f"<b>Dr. {latest_visit.get('doctor_name', '')}</b>",
+            "Authorized Signature / Stamp",
+            f"<font size='7' color='#64748b'>Prescribed on: {visit_date}</font>"
+        ]
+        sig_para = Paragraph("<br/>".join(sig_lines), ParagraphStyle("sig", parent=styles["body"], alignment=2, leading=12))
+        
+        sig_table = Table([["", sig_para]], colWidths=[5.0*inch, 2.5*inch])
+        sig_table.setStyle(TableStyle([
+            ("VALIGN",   (0, 0), (-1, -1), "TOP"),
+            ("PADDING",  (0, 0), (-1, -1), 0),
+            ("LINEABOVE", (1, 0), (1, 0), 0.5, C_TEXT_MUTED),
+        ]))
+        visit_block.append(Spacer(1, 16))
+        visit_block.append(sig_table)
+        visit_block.append(Spacer(1, 16))
+
+        elements.append(KeepTogether(visit_block))
+
+        # Collect historical info from older visits & patient record
+        past_diagnoses = set()
+        past_treatments = []
+        
+        if len(visits) > 1:
+            for v in visits[1:]:
+                if v.get("diagnosis"):
+                    past_diagnoses.add(v["diagnosis"])
+                for tooth_id, info in (v.get("dental_chart") or {}).items():
+                    if info.get("done") and info.get("procedure"):
+                        past_treatments.append(f"Tooth #{tooth_id}: {info.get('procedure')}")
+
+        if patient.get("historical_diagnosis"):
+            past_diagnoses.add(patient["historical_diagnosis"])
+            
+        hist_dental = patient.get("historical_dental_chart") or {}
+        for tooth_id, info in hist_dental.items():
+            if info.get("done") and info.get("procedure"):
+                past_treatments.append(f"Tooth #{tooth_id}: {info.get('procedure')}")
+
+        if past_diagnoses or past_treatments:
+            prev_block = []
+            prev_block.append(Paragraph("<b>📜 Previous History & Treatments Summary</b>", styles["section"]))
+            prev_block.append(HRFlowable(width="100%", thickness=0.5, color=C_BORDER, spaceBefore=2, spaceAfter=4))
+            
+            summary_parts = []
+            if past_diagnoses:
+                summary_parts.append(f"<b>Past Diagnoses:</b> {', '.join(sorted(past_diagnoses))}")
+            if past_treatments:
+                summary_parts.append(f"<b>Past Dental Procedures:</b> {', '.join(past_treatments)}")
+                
+            prev_block.append(Paragraph("<br/>".join(summary_parts), styles["body"]))
+            elements.append(Spacer(1, 10))
+            elements.append(KeepTogether(prev_block))
 
     # Build document and run footer drawing callback
     doc.build(elements, onFirstPage=_draw_footer, onLaterPages=_draw_footer)

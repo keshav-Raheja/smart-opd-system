@@ -3,6 +3,7 @@ from controllers.appointment_controller import (
     create_appointment,
     get_appointments,
     update_appointment_status,
+    update_appointment,
     delete_appointment,
     get_today_appointments,
 )
@@ -23,6 +24,10 @@ appointment_bp.route("/", methods=["GET"])(
 
 appointment_bp.route("/<id>/status", methods=["PUT"])(
     token_required(role_required(_ALL_STAFF)(update_appointment_status))
+)
+
+appointment_bp.route("/<id>", methods=["PUT"])(
+    token_required(role_required(_ALL_STAFF)(update_appointment))
 )
 
 appointment_bp.route("/<id>", methods=["DELETE"])(

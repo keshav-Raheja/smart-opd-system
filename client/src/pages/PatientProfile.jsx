@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "../layouts/MainLayout";
 import api from "../services/api";
 import ReportUpload from "../components/ReportUpload";
+import DentalChart from "../components/DentalChart";
 import { useToast } from "../context/ToastContext";
 
 const TABS = ["Overview", "Visits", "Reports", "AI Analysis"];
@@ -27,6 +28,113 @@ function PatientProfile() {
   const [summary,  setSummary]  = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [activeTab, setActiveTab] = useState("Overview");
+
+  // Edit form states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "", age: "", gender: "", phone: "", address: "", blood_group: "",
+    is_historical: false,
+    historical_visits: "",
+    historical_paid_amount: "",
+    historical_diagnosis: "",
+    historical_medicines: "",
+  });
+  const [editDentalChart, setEditDentalChart] = useState({});
+  const [diagSuggestions, setDiagSuggestions] = useState([]);
+  const [showDiagSuggestions, setShowDiagSuggestions] = useState(false);
+  const [medSuggestions, setMedSuggestions] = useState([]);
+  const [showMedSuggestions, setShowMedSuggestions] = useState(false);
+
+  const startEditing = () => {
+    const hasHistory = !!(patient.historical_visits || patient.historical_diagnosis || patient.historical_medicines || patient.historical_paid_amount || Object.keys(patient.historical_dental_chart || {}).length > 0);
+    setEditForm({
+      name: patient.name || "",
+      age: patient.age || "",
+      gender: patient.gender || "",
+      phone: patient.phone || "",
+      address: patient.address || "",
+      blood_group: patient.blood_group || "",
+      is_historical: hasHistory,
+      historical_visits: patient.historical_visits || "",
+      historical_paid_amount: patient.historical_paid_amount || "",
+      historical_diagnosis: patient.historical_diagnosis || "",
+      historical_medicines: patient.historical_medicines || "",
+    });
+    setEditDentalChart(patient.historical_dental_chart || {});
+    setIsEditing(true);
+  };
+
+  const handleDiagChange = async (val) => {
+    setEditForm(prev => ({ ...prev, historical_diagnosis: val }));
+    if (val.trim().length < 2) {
+      setDiagSuggestions([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/visits/diagnoses/search?query=${val}`);
+      setDiagSuggestions(response.data);
+      setShowDiagSuggestions(true);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMedChange = async (val) => {
+    setEditForm(prev => ({ ...prev, historical_medicines: val }));
+    const tokens = val.split(",");
+    const currentToken = tokens[tokens.length - 1].trim();
+    if (currentToken.length < 2) {
+      setMedSuggestions([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/medicines/search?query=${currentToken}`);
+      setMedSuggestions(response.data);
+      setShowMedSuggestions(true);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMedSelect = (medName) => {
+    const tokens = editForm.historical_medicines.split(",");
+    tokens[tokens.length - 1] = " " + medName;
+    const updated = tokens.join(",").trim() + ", ";
+    setEditForm(prev => ({ ...prev, historical_medicines: updated }));
+    setMedSuggestions([]);
+    setShowMedSuggestions(false);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: editForm.name,
+        age: parseInt(editForm.age) || 0,
+        gender: editForm.gender,
+        phone: editForm.phone,
+        address: editForm.address,
+        blood_group: editForm.blood_group,
+        is_historical: editForm.is_historical,
+        ...(editForm.is_historical ? {
+          historical_visits: parseInt(editForm.historical_visits) || 0,
+          historical_paid_amount: parseFloat(editForm.historical_paid_amount) || 0,
+          historical_diagnosis: editForm.historical_diagnosis,
+          historical_medicines: editForm.historical_medicines,
+          historical_dental_chart: editDentalChart,
+        } : {})
+      };
+
+      await api.put(`/patients/${id}`, payload);
+      toast.success("Patient Updated", "Profile and history changes have been saved.");
+      setIsEditing(false);
+      fetchPatient();
+      fetchVisits();
+      fetchSummary();
+    } catch (err) {
+      toast.error("Error", err.response?.data?.message || "Failed to update patient profile.");
+    }
+  };
 
   const fetchPatient = async () => {
     try {
@@ -194,6 +302,31 @@ function PatientProfile() {
               >
                 📄 Generate Prescription PDF
               </a>
+
+              {/* Edit Button */}
+              {(userRole === "Doctor" || userRole === "Admin") && (
+                <button
+                  onClick={startEditing}
+                  className="btn"
+                  style={{
+                    background: "rgba(59, 130, 246, 0.1)",
+                    border: "1px solid #3b82f6",
+                    color: "#3b82f6",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#3b82f6"; e.currentTarget.style.color = "white"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(59, 130, 246, 0.1)"; e.currentTarget.style.color = "#3b82f6"; }}
+                >
+                  ✏️ Edit Profile & History
+                </button>
+              )}
 
               {/* Delete Button */}
               {(userRole === "Doctor" || userRole === "Admin") && (
@@ -472,6 +605,285 @@ function PatientProfile() {
           )}
         </div>
       </div>
+
+      {isEditing && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1100,
+          background: "rgba(15, 23, 42, 0.6)",
+          backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 20
+        }}>
+          <div className="card" style={{
+            width: "100%", maxWidth: 680, maxHeight: "90vh",
+            overflowY: "auto", padding: 24, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, fontFamily: "'Outfit', sans-serif" }}>
+                ✏️ Edit Patient Profile & History
+              </h2>
+              <button
+                onClick={() => setIsEditing(false)}
+                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--color-text-secondary)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit}>
+              <div className="grid-form-2" style={{ gap: 12, marginBottom: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Full Name *</label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Age *</label>
+                  <input
+                    type="number"
+                    value={editForm.age}
+                    onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
+                    className="form-input"
+                    required
+                    min="0"
+                    max="150"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Gender *</label>
+                  <select
+                    value={editForm.gender}
+                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                    className="form-input form-select"
+                    required
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone *</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Blood Group</label>
+                  <select
+                    value={editForm.blood_group}
+                    onChange={(e) => setEditForm({ ...editForm, blood_group: e.target.value })}
+                    className="form-input form-select"
+                  >
+                    <option value="">Select Blood Group</option>
+                    {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((bg) => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <input
+                    type="text"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              {/* Historical Toggle */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                margin: "14px 0", padding: "10px",
+                background: "var(--color-surface-2)", borderRadius: 8
+              }}>
+                <input
+                  type="checkbox"
+                  id="edit-is-historical-checkbox"
+                  checked={editForm.is_historical}
+                  onChange={(e) => setEditForm({ ...editForm, is_historical: e.target.checked })}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+                <label htmlFor="edit-is-historical-checkbox" style={{ fontWeight: 600, fontSize: 13, color: "var(--color-text-secondary)", cursor: "pointer" }}>
+                  Include Historical Patient Records (Prior Visits, Bills, & Treatments)
+                </label>
+              </div>
+
+              {editForm.is_historical && (
+                <div style={{
+                  background: "var(--color-surface-3)",
+                  border: "1px dashed var(--color-border)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--color-accent)", marginBottom: 12 }}>
+                    📜 Historical Patient Records
+                  </h3>
+                  
+                  <div className="grid-form-2" style={{ gap: 12, marginBottom: 12 }}>
+                    <div className="form-group">
+                      <label className="form-label">Total Prior Visits *</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 5"
+                        min="1"
+                        value={editForm.historical_visits}
+                        onChange={(e) => setEditForm({ ...editForm, historical_visits: e.target.value })}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Total Amount Paid previously (₹) *</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 2500"
+                        min="0"
+                        value={editForm.historical_paid_amount}
+                        onChange={(e) => setEditForm({ ...editForm, historical_paid_amount: e.target.value })}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 12, position: "relative" }}>
+                    <label className="form-label">Prior Diagnoses Summary</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Chronic Periodontitis, Deep caries"
+                      value={editForm.historical_diagnosis || ""}
+                      onChange={(e) => handleDiagChange(e.target.value)}
+                      onFocus={() => { if (diagSuggestions.length > 0) setShowDiagSuggestions(true); }}
+                      className="form-input"
+                      autoComplete="off"
+                    />
+                    {showDiagSuggestions && diagSuggestions.length > 0 && (
+                      <>
+                        <div
+                          style={{ position: "fixed", inset: 0, zIndex: 1199 }}
+                          onClick={() => setShowDiagSuggestions(false)}
+                        />
+                        <div style={{
+                          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 1200,
+                          background: "white", border: "1px solid var(--color-border)",
+                          borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          maxHeight: 180, overflowY: "auto", marginTop: 4, padding: 4
+                        }}>
+                          {diagSuggestions.map((diag) => (
+                            <div
+                              key={diag}
+                              onClick={() => {
+                                setEditForm(prev => ({ ...prev, historical_diagnosis: diag }));
+                                setShowDiagSuggestions(false);
+                              }}
+                              style={{
+                                padding: "8px 12px", cursor: "pointer", borderRadius: 6,
+                                fontSize: 13, color: "var(--color-text-primary)"
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                            >
+                              {diag}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 16, position: "relative" }}>
+                    <label className="form-label">Prior Prescribed Medicines (Comma separated)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Amoxicillin 500mg, Paracetamol 650mg"
+                      value={editForm.historical_medicines || ""}
+                      onChange={(e) => handleMedChange(e.target.value)}
+                      onFocus={() => { if (medSuggestions.length > 0) setShowMedSuggestions(true); }}
+                      className="form-input"
+                      autoComplete="off"
+                    />
+                    {showMedSuggestions && medSuggestions.length > 0 && (
+                      <>
+                        <div
+                          style={{ position: "fixed", inset: 0, zIndex: 1199 }}
+                          onClick={() => setShowMedSuggestions(false)}
+                        />
+                        <div style={{
+                          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 1200,
+                          background: "white", border: "1px solid var(--color-border)",
+                          borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          maxHeight: 180, overflowY: "auto", marginTop: 4, padding: 4
+                        }}>
+                          {medSuggestions.map((med) => (
+                            <div
+                              key={med.id || med.name}
+                              onClick={() => handleMedSelect(med.name)}
+                              style={{
+                                padding: "8px 12px", cursor: "pointer", borderRadius: 6,
+                                fontSize: 13, color: "var(--color-text-primary)"
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                            >
+                              <span style={{ fontWeight: 600 }}>{med.name}</span>
+                              {med.therapeutic_class && (
+                                <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: 6 }}>
+                                  ({med.therapeutic_class})
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {user?.opd_type === "Dental" && (
+                    <div style={{ marginTop: 10, borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
+                      <DentalChart
+                        chart={editDentalChart}
+                        onChange={setEditDentalChart}
+                        readOnly={false}
+                        toothHistory={{}}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 20 }}>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="btn"
+                  style={{ background: "var(--color-surface-3)", border: "1px solid var(--color-border)" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

@@ -4,7 +4,8 @@ from controllers.patient_controller import (
     add_patient,
     get_all_patients,
     get_single_patient,
-    delete_patient
+    delete_patient,
+    update_patient
 )
 
 from middleware.auth_middleware import (
@@ -45,6 +46,14 @@ def patients():
 def single_patient(patient_id):
 
     return get_single_patient(patient_id)
+
+
+@patient_bp.route("/<patient_id>", methods=["PUT"])
+@token_required
+@role_required(["Doctor", "Admin"])
+def edit_patient(patient_id):
+
+    return update_patient(patient_id)
 
 
 @patient_bp.route("/<patient_id>", methods=["DELETE"])

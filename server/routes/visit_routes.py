@@ -4,6 +4,7 @@ from controllers.visit_controller import (
     create_visit,
     get_patient_visits,
     get_patient_summary,
+    search_diagnoses,
 )
 
 from middleware.auth_middleware import (
@@ -31,5 +32,12 @@ visit_bp.route("/patient/<patient_id>", methods=["GET"])(
 visit_bp.route("/summary/<patient_id>", methods=["GET"])(
     token_required(
         role_required(["Doctor", "Admin", "Receptionist"])(get_patient_summary)
+    )
+)
+
+# ── Search diagnosis autocompletes ─────────────────────────────────────────────
+visit_bp.route("/diagnoses/search", methods=["GET"])(
+    token_required(
+        role_required(["Doctor", "Admin", "Receptionist"])(search_diagnoses)
     )
 )

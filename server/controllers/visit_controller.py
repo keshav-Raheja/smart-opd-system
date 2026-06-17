@@ -8,7 +8,7 @@ Endpoints:
 """
 
 from flask import request, jsonify
-from config.db import visits_collection, bills_collection, appointments_collection
+from config.db import visits_collection, bills_collection, appointments_collection, patients_collection
 from bson import ObjectId
 from datetime import datetime
 
@@ -53,6 +53,36 @@ def create_visit():
         except Exception as e:
             print(f"[VisitController] Error updating appointment status: {e}")
 
+    # Automatically schedule follow-up appointment if follow_up_date is provided
+    follow_up_date = data.get("follow_up_date")
+    if follow_up_date:
+        follow_up_time = data.get("follow_up_time", "")
+        follow_up_duration = data.get("follow_up_duration")
+        if follow_up_duration is None:
+            follow_up_duration = 15
+        else:
+            try:
+                follow_up_duration = int(follow_up_duration)
+            except ValueError:
+                follow_up_duration = 15
+
+        follow_up_appt = {
+            "patient_id":        data.get("patient_id"),
+            "patient_name":      data.get("patient_name"),
+            "doctor_name":       data.get("doctor_name") or request.user.get("name", "Doctor"),
+            "appointment_date":  follow_up_date,
+            "appointment_time":  follow_up_time,
+            "duration":          follow_up_duration,
+            "status":            "Scheduled",
+            "reason":            "Follow-up",
+            "opd_id":            opd_id,
+            "created_at":        datetime.utcnow(),
+        }
+        try:
+            appointments_collection.insert_one(follow_up_appt)
+        except Exception as e:
+            print(f"[VisitController] Error creating follow-up appointment: {e}")
+
     return jsonify({"message": "Visit saved", "visit_id": str(result.inserted_id)}), 201
 
 
@@ -73,11 +103,14 @@ def get_patient_summary(patient_id):
     visits = list(
         visits_collection.find(
             {"patient_id": patient_id},
-            {"created_at": 1, "diagnosis": 1, "prescription": 1, "doctor_name": 1, "dental_chart": 1}
+            {"created_at": 1, "diagnosis": 1, "prescription": 1, "doctor_name": 1, "dental_chart": 1, "is_historical": 1}
         ).sort("created_at", 1)
     )
 
-    total_visits = len(visits)
+    patient = patients_collection.find_one({"_id": ObjectId(patient_id)})
+    historical_visits = int(patient.get("historical_visits", 0)) if patient else 0
+    non_historical_visits = len([v for v in visits if not v.get("is_historical")])
+    total_visits = non_historical_visits + historical_visits
     first_visit  = None
     last_visit   = None
     diagnoses    = set()
@@ -144,3 +177,42 @@ def get_patient_summary(patient_id):
             "total_bills":  billing.get("total_bills",  0),
         }
     }), 200
+
+
+COMMON_DIAGNOSES = [
+    "Dental Caries", "Pulpitis", "Apical Periodontitis", "Gingivitis", 
+    "Chronic Periodontitis", "Periapical Abscess", "Impacted Tooth",
+    "Hypertension", "Type 2 Diabetes", "Acute Upper Respiratory Infection", 
+    "Gastroesophageal Reflux Disease", "Migraine", "Allergic Rhinitis",
+    "Pulp necrosis", "Deep dentinal caries", "Reversible pulpitis", "Irreversible pulpitis"
+]
+
+def search_diagnoses():
+    query = request.args.get("query", "").strip()
+    if not query:
+        return jsonify([]), 200
+
+    opd_id = request.user.get("opd_id")
+    match_q = {"diagnosis": {"$regex": query, "$options": "i"}}
+    if opd_id:
+        match_q["opd_id"] = opd_id
+
+    try:
+        results = list(visits_collection.aggregate([
+            {"$match": match_q},
+            {"$group": {"_id": "$diagnosis"}},
+            {"$limit": 10}
+        ]))
+        db_diagnoses = [r["_id"] for r in results if r.get("_id")]
+    except Exception as e:
+        print(f"[VisitController] Error searching diagnoses: {e}")
+        db_diagnoses = []
+
+    merged = list(db_diagnoses)
+    for cd in COMMON_DIAGNOSES:
+        if query.lower() in cd.lower() and cd not in merged:
+            merged.append(cd)
+            if len(merged) >= 10:
+                break
+
+    return jsonify(merged[:10]), 200

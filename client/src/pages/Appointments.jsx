@@ -15,6 +15,15 @@ const STATUS_STYLE = {
 const Appointments = () => {
   const toast = useToast();
   const [appointments, setAppointments] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    doctor_name: "",
+    appointment_date: "",
+    appointment_time: "",
+    duration: 15,
+    reason: "",
+    status: "Scheduled",
+  });
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -61,6 +70,10 @@ const Appointments = () => {
   const [viewMode, setViewMode] = useState("list"); // "list" | "scheduler"
   const [schedulerStartDate, setSchedulerStartDate] = useState(new Date());
   const [selectedApptDetails, setSelectedApptDetails] = useState(null);
+
+  useEffect(() => {
+    setIsEditing(false);
+  }, [selectedApptDetails]);
 
   const START_HOUR = 8;
   const END_HOUR = 20;
@@ -282,6 +295,25 @@ const Appointments = () => {
       fetchAppointments();
     } catch (error) {
       toast.error("Error", "Could not delete appointment");
+    }
+  };
+
+  const handleUpdateAppointment = async () => {
+    if (!editForm.doctor_name.trim() || !editForm.appointment_date || !editForm.appointment_time) {
+      toast.warning("Missing Fields", "Please complete all required fields");
+      return;
+    }
+    try {
+      await api.put(`/appointments/${selectedApptDetails._id}`, editForm);
+      toast.success("Appointment Updated", "Changes saved successfully");
+      setIsEditing(false);
+      setSelectedApptDetails({
+        ...selectedApptDetails,
+        ...editForm,
+      });
+      fetchAppointments();
+    } catch (error) {
+      toast.error("Error", "Could not update appointment");
     }
   };
 
@@ -730,22 +762,22 @@ const Appointments = () => {
                     const style = STATUS_STYLE[appt.status] || STATUS_STYLE.Scheduled;
                     return (
                       <tr key={appt._id} className={`animate-fade-in stagger-${Math.min(i+1, 4)}`}>
-                        <td>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer" }}>
                           <div style={{ fontWeight: 600 }}>{appt.patient_name}</div>
                           <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>ID: {appt.patient_id}</div>
                         </td>
-                        <td>Dr. {appt.doctor_name}</td>
-                        <td>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer" }}>Dr. {appt.doctor_name}</td>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer" }}>
                           {appt.appointment_date
                             ? new Date(appt.appointment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
                             : appt.appointment_date}
                         </td>
-                        <td>{appt.appointment_time}</td>
-                        <td>{appt.duration || 15} mins</td>
-                        <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer" }}>{appt.appointment_time}</td>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer" }}>{appt.duration || 15} mins</td>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {appt.reason || "—"}
                         </td>
-                        <td>
+                        <td onClick={() => setSelectedApptDetails(appt)} style={{ cursor: "pointer" }}>
                           <span className={`status-badge ${style.badge}`}>{appt.status}</span>
                         </td>
                         <td>
@@ -1060,77 +1092,164 @@ const Appointments = () => {
               </button>
             </div>
             <div className="card-body" style={{ padding: "20px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* Patient Info */}
-                <div>
-                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Patient</label>
-                  <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>{selectedApptDetails.patient_name}</div>
-                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Patient ID: {selectedApptDetails.patient_id}</div>
-                </div>
-
-                {/* Doctor Info */}
-                <div>
-                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Doctor Assigned</label>
-                  <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)" }}>Dr. {selectedApptDetails.doctor_name}</div>
-                </div>
-
-                {/* Time & Duration */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {isEditing ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {/* Patient Info */}
                   <div>
-                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Date & Time</label>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                      {new Date(selectedApptDetails.appointment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                      <br />
-                      🕒 {selectedApptDetails.appointment_time}
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Patient</label>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>{selectedApptDetails.patient_name}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Patient ID: {selectedApptDetails.patient_id}</div>
+                  </div>
+
+                  {/* Doctor Info */}
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Doctor Assigned *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.doctor_name}
+                      onChange={(e) => setEditForm({ ...editForm, doctor_name: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  {/* Date & Time */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Date *</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={editForm.appointment_date}
+                        onChange={(e) => setEditForm({ ...editForm, appointment_date: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Time *</label>
+                      <input
+                        type="time"
+                        className="form-input"
+                        value={editForm.appointment_time}
+                        onChange={(e) => setEditForm({ ...editForm, appointment_time: e.target.value })}
+                        required
+                      />
                     </div>
                   </div>
+
+                  {/* Duration & Status */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Duration *</label>
+                      <select
+                        className="form-input form-select"
+                        value={editForm.duration}
+                        onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) })}
+                      >
+                        <option value={15}>15 Mins</option>
+                        <option value={30}>30 Mins</option>
+                        <option value={45}>45 Mins</option>
+                        <option value={60}>60 Mins</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Status</label>
+                      <select
+                        className="form-input form-select"
+                        value={editForm.status}
+                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      >
+                        {STATUS_FLOW.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Reason for Visit</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.reason}
+                      onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {/* Patient Info */}
                   <div>
-                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Duration</label>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                      ⏱️ {selectedApptDetails.duration || 15} Minutes
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Patient</label>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>{selectedApptDetails.patient_name}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Patient ID: {selectedApptDetails.patient_id}</div>
+                  </div>
+
+                  {/* Doctor Info */}
+                  <div>
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Doctor Assigned</label>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)" }}>Dr. {selectedApptDetails.doctor_name}</div>
+                  </div>
+
+                  {/* Time & Duration */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Date & Time</label>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                        {new Date(selectedApptDetails.appointment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        <br />
+                        🕒 {selectedApptDetails.appointment_time}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Duration</label>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                        ⏱️ {selectedApptDetails.duration || 15} Minutes
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Reason for Visit</label>
+                    <div style={{
+                      fontSize: "12px",
+                      color: "var(--color-text-secondary)",
+                      background: "var(--color-surface-2)",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      marginTop: "4px",
+                      border: "1px solid var(--color-border-subtle)"
+                    }}>
+                      {selectedApptDetails.reason || "No reason specified"}
+                    </div>
+                  </div>
+
+                  {/* Status Selector */}
+                  <div>
+                    <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Update Status</label>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <select
+                        value={selectedApptDetails.status}
+                        onChange={(e) => {
+                          updateStatus(selectedApptDetails._id, e.target.value);
+                          setSelectedApptDetails({ ...selectedApptDetails, status: e.target.value });
+                        }}
+                        className="form-input form-select"
+                        style={{ flex: 1 }}
+                      >
+                        {STATUS_FLOW.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <span className={`status-badge ${(STATUS_STYLE[selectedApptDetails.status] || STATUS_STYLE.Scheduled).badge}`} style={{ padding: "8px 12px", height: "38px", display: "flex", alignItems: "center" }}>
+                        {selectedApptDetails.status}
+                      </span>
                     </div>
                   </div>
                 </div>
-
-                {/* Reason */}
-                <div>
-                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Reason for Visit</label>
-                  <div style={{
-                    fontSize: "12px",
-                    color: "var(--color-text-secondary)",
-                    background: "var(--color-surface-2)",
-                    padding: "8px 12px",
-                    borderRadius: "6px",
-                    marginTop: "4px",
-                    border: "1px solid var(--color-border-subtle)"
-                  }}>
-                    {selectedApptDetails.reason || "No reason specified"}
-                  </div>
-                </div>
-
-                {/* Status Selector */}
-                <div>
-                  <label style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Update Status</label>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <select
-                      value={selectedApptDetails.status}
-                      onChange={(e) => {
-                        updateStatus(selectedApptDetails._id, e.target.value);
-                        setSelectedApptDetails({ ...selectedApptDetails, status: e.target.value });
-                      }}
-                      className="form-input form-select"
-                      style={{ flex: 1 }}
-                    >
-                      {STATUS_FLOW.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <span className={`status-badge ${(STATUS_STYLE[selectedApptDetails.status] || STATUS_STYLE.Scheduled).badge}`} style={{ padding: "8px 12px", height: "38px", display: "flex", alignItems: "center" }}>
-                      {selectedApptDetails.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* Actions Footer */}
               <div style={{
@@ -1141,27 +1260,70 @@ const Appointments = () => {
                 paddingTop: "16px",
                 gap: 12
               }}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (window.confirm("Delete this appointment?")) {
-                      await deleteAppointment(selectedApptDetails._id);
-                      setSelectedApptDetails(null);
-                    }
-                  }}
-                  className="btn btn-danger"
-                  style={{ display: "flex", alignItems: "center", gap: 4 }}
-                >
-                  🗑️ Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedApptDetails(null)}
-                  className="btn btn-secondary"
-                  style={{ minWidth: "100px" }}
-                >
-                  Close
-                </button>
+                {isEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="btn btn-secondary"
+                      style={{ minWidth: "100px" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUpdateAppointment}
+                      className="btn btn-primary"
+                      style={{ minWidth: "120px" }}
+                    >
+                      💾 Save Changes
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm("Delete this appointment?")) {
+                          await deleteAppointment(selectedApptDetails._id);
+                          setSelectedApptDetails(null);
+                        }
+                      }}
+                      className="btn btn-danger"
+                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      🗑️ Delete
+                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditForm({
+                            doctor_name: selectedApptDetails.doctor_name,
+                            appointment_date: selectedApptDetails.appointment_date,
+                            appointment_time: selectedApptDetails.appointment_time,
+                            duration: selectedApptDetails.duration || 15,
+                            reason: selectedApptDetails.reason || "",
+                            status: selectedApptDetails.status || "Scheduled",
+                          });
+                          setIsEditing(true);
+                        }}
+                        className="btn btn-secondary"
+                        style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedApptDetails(null)}
+                        className="btn btn-secondary"
+                        style={{ minWidth: "100px" }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
