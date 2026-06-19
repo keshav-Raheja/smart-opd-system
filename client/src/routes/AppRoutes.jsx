@@ -8,6 +8,7 @@ import Register from "../pages/Register";
 import Appointments from "../pages/Appointments";
 import Unauthorized from "../pages/Unauthorized";
 import DoctorPanel from "../pages/DoctorPanel";
+import TreatmentDashboard from "../pages/TreatmentDashboard";
 import AIReportSupport from "../pages/AIReportSupport";
 import Billing from "../pages/Billing";
 import FeeConfig from "../pages/FeeConfig";
@@ -103,6 +104,18 @@ function AppRoutes() {
             <ProtectedRoute allowedRoles={[ROLES.DOCTOR]}>
               <MainLayout>
                 <DoctorPanel />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Treatment Tracker */}
+        <Route
+          path="/treatments"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.DOCTOR]}>
+              <MainLayout>
+                <TreatmentDashboard />
               </MainLayout>
             </ProtectedRoute>
           }

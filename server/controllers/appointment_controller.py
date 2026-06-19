@@ -40,7 +40,7 @@ def create_appointment():
 
 def _cleanup_expired_appointments():
     try:
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = datetime.now().strftime("%Y-%m-%d")
         appointments_collection.delete_many({
             "appointment_date": {"$lt": today},
             "status": "Scheduled"
@@ -49,8 +49,53 @@ def _cleanup_expired_appointments():
         print(f"[AppointmentController] Error in cleanup: {e}")
 
 
+def _auto_complete_past_active_appointments():
+    try:
+        now = datetime.now()
+        current_date_str = now.strftime("%Y-%m-%d")
+        
+        # Query Checked-In and In Consultation appointments
+        query = {
+            "status": {"$in": ["Checked-In", "In Consultation"]}
+        }
+        
+        to_complete_ids = []
+        for appt in appointments_collection.find(query):
+            appt_date = appt.get("appointment_date")
+            appt_time = appt.get("appointment_time")
+            
+            if not appt_date:
+                continue
+                
+            # Case 1: Date is strictly in the past
+            if appt_date < current_date_str:
+                to_complete_ids.append(appt["_id"])
+                continue
+                
+            # Case 2: Date is today, check if 2+ hours have passed since scheduled start time
+            if appt_date == current_date_str and appt_time:
+                try:
+                    appt_h, appt_m = map(int, appt_time.split(":"))
+                    appt_dt = now.replace(hour=appt_h, minute=appt_m, second=0, microsecond=0)
+                    diff_seconds = (now - appt_dt).total_seconds()
+                    if diff_seconds >= 2 * 3600:  # 2 hours
+                        to_complete_ids.append(appt["_id"])
+                except Exception:
+                    pass
+                    
+        if to_complete_ids:
+            appointments_collection.update_many(
+                {"_id": {"$in": to_complete_ids}},
+                {"$set": {"status": "Completed"}}
+            )
+            print(f"[AppointmentController] Auto-completed {len(to_complete_ids)} past active appointments.")
+    except Exception as e:
+        print(f"[AppointmentController] Error in auto-complete: {e}")
+
+
 def get_appointments():
     _cleanup_expired_appointments()
+    _auto_complete_past_active_appointments()
     query = _opd_query()
     appointments = []
     for a in appointments_collection.find(query).sort("created_at", -1):
@@ -103,7 +148,8 @@ def delete_appointment(id):
 
 def get_today_appointments():
     _cleanup_expired_appointments()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    _auto_complete_past_active_appointments()
+    today = datetime.now().strftime("%Y-%m-%d")
     query = {**_opd_query(), "appointment_date": today}
     appointments = []
     for a in appointments_collection.find(query):

@@ -247,6 +247,7 @@ export default function BillingSection({ patient, visitId, onBillCreated }) {
       patient_name:   patient.patient_name,
       doctor_name:    patient.doctor_name || "",
       visit_id:       visitId || null,
+      appointment_id: patient._id || null,
       line_items:     lineItems.map((it) => ({
         type:        it.type,
         description: it.description,

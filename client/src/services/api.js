@@ -1,8 +1,9 @@
 import axios from "axios";
 
 const api = axios.create({
-
-  baseURL: "https://smart-opd-backend-dzoq.onrender.com/api",
+  baseURL: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:5000/api"
+    : "https://smart-opd-backend-dzoq.onrender.com/api",
 });
 
 api.interceptors.request.use(

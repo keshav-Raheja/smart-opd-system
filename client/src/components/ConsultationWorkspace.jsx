@@ -28,7 +28,7 @@ const EMPTY_FORM = {
   follow_up_date: "", follow_up_time: "", follow_up_duration: 15,
 };
 
-function ConsultationWorkspace({ patient }) {
+function ConsultationWorkspace({ patient, onWorkflowComplete }) {
   const toast = useToast();
 
   const [formData,     setFormData]     = useState(EMPTY_FORM);
@@ -241,9 +241,13 @@ function ConsultationWorkspace({ patient }) {
                 patient_id:   patient.patient_id,
                 patient_name: patient.patient_name,
                 doctor_name:  JSON.parse(localStorage.getItem("user") || "{}")?.name || "",
+                _id:          patient._id,
               }}
               visitId={savedVisitId}
-              onBillCreated={() => setSavedVisitId(null)}
+              onBillCreated={() => {
+                setSavedVisitId(null);
+                onWorkflowComplete?.();
+              }}
             />
           </div>
         )}

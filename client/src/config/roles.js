@@ -18,4 +18,5 @@ export const ROLE_ACCESS = {
   analytics: [ROLES.ADMIN],
   opdManagement: [ROLES.ADMIN],   // NEW
   staffManagement: [ROLES.DOCTOR, ROLES.ADMIN],
+  treatmentDashboard: [ROLES.DOCTOR],
 };

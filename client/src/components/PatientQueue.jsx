@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
-function PatientQueue({ setSelectedPatient, selectedPatient }) {
+function PatientQueue({ setSelectedPatient, selectedPatient, onQueueChange, refreshTrigger }) {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -9,7 +9,7 @@ function PatientQueue({ setSelectedPatient, selectedPatient }) {
     fetchQueue();
     const interval = setInterval(fetchQueue, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshTrigger]);
 
   const fetchQueue = async () => {
     try {
@@ -18,6 +18,7 @@ function PatientQueue({ setSelectedPatient, selectedPatient }) {
         (item) => item.status === "Checked-In" || item.status === "In Consultation"
       );
       setAppointments(filtered);
+      onQueueChange?.(filtered);
     } catch (error) {
       console.error(error);
     } finally {

@@ -47,7 +47,7 @@ from flask import request, jsonify
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from config.db import bills_collection, visits_collection
+from config.db import bills_collection, visits_collection, appointments_collection
 
 
 # ─────────────────────────────────────────────────────────────
@@ -198,14 +198,33 @@ def create_bill():
     result = bills_collection.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
 
+    # Mark the associated appointment as Completed if passed
+    appointment_id = data.get("appointment_id")
+    if appointment_id:
+        try:
+            appointments_collection.update_one(
+                {"_id": ObjectId(appointment_id)},
+                {"$set": {"status": "Completed"}}
+            )
+        except Exception as e:
+            print(f"[BillingController] Error completing appointment: {e}")
+
     # If linked to a visit, store the bill_id on the visit doc too
     if doc.get("visit_id"):
         try:
-            visits_collection.update_one(
-                {"_id": ObjectId(doc["visit_id"])},
-                {"$set": {"bill_id": str(result.inserted_id),
-                          "bill_amount": totals["total_amount"]}}
-            )
+            visit = visits_collection.find_one({"_id": ObjectId(doc["visit_id"])})
+            if visit:
+                visits_collection.update_one(
+                    {"_id": ObjectId(doc["visit_id"])},
+                    {"$set": {"bill_id": str(result.inserted_id),
+                              "bill_amount": totals["total_amount"]}}
+                )
+                appt_id = visit.get("appointment_id")
+                if appt_id:
+                    appointments_collection.update_one(
+                        {"_id": ObjectId(appt_id)},
+                        {"$set": {"status": "Completed"}}
+                    )
         except (InvalidId, Exception):
             pass
 

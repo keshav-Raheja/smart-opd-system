@@ -143,6 +143,8 @@ def get_patient_summary(patient_id):
             tooth_history[tooth_id].append({
                 "procedure": tooth_data.get("procedure", ""),
                 "done":      tooth_data.get("done", False),
+                "status":    tooth_data.get("status", "completed" if tooth_data.get("done") else "planned"),
+                "session":   tooth_data.get("session", ""),
                 "notes":     tooth_data.get("notes", ""),
                 "date":      iso,
             })
@@ -216,3 +218,129 @@ def search_diagnoses():
                 break
 
     return jsonify(merged[:10]), 200
+
+
+def get_treatments_dashboard():
+    role   = request.user.get("role")
+    opd_id = request.user.get("opd_id")
+    
+    # Non-admin: filter by OPD
+    if role == "Admin":
+        patients_query = {}
+    elif opd_id:
+        patients_query = {"opd_id": opd_id}
+    else:
+        patients_query = {"opd_id": "__none__"}
+        
+    # Get all patients under the OPD
+    patients = list(patients_collection.find(patients_query, {"name": 1}))
+    patient_names = {str(p["_id"]): p["name"] for p in patients}
+    patient_ids = list(patient_names.keys())
+    
+    # Get all visits for these patients, sorted by created_at ascending to build timeline progress
+    visits = list(visits_collection.find(
+        {"patient_id": {"$in": patient_ids}}
+    ).sort("created_at", 1))
+    
+    # Track latest status per patient per tooth
+    # Format: { patient_id: { tooth_id: { procedure, status, session, notes, date, follow_up_date } } }
+    patient_tooth_states = {}
+    
+    for v in visits:
+        pid = v.get("patient_id")
+        dt = v.get("created_at")
+        iso_date = dt.strftime("%Y-%m-%d") if isinstance(dt, datetime) else (str(dt)[:10] if dt else "")
+        follow_up = v.get("follow_up_date") or ""
+        
+        if pid not in patient_tooth_states:
+            patient_tooth_states[pid] = {}
+            
+        for tooth_id, tooth_data in (v.get("dental_chart") or {}).items():
+            procedure = tooth_data.get("procedure")
+            if not procedure:
+                continue
+                
+            status = tooth_data.get("status")
+            if not status:
+                status = "completed" if tooth_data.get("done") else "planned"
+                
+            # Update to latest visit's record
+            patient_tooth_states[pid][tooth_id] = {
+                "procedure": procedure,
+                "status": status,
+                "session": tooth_data.get("session", ""),
+                "notes": tooth_data.get("notes", ""),
+                "last_visit_date": iso_date,
+                "last_follow_up": follow_up,
+            }
+            
+    # Now query future scheduled appointments for all these patients
+    now_str = datetime.now().strftime("%Y-%m-%d")
+    appts = list(appointments_collection.find({
+        "patient_id": {"$in": patient_ids},
+        "appointment_date": {"$gte": now_str},
+        "status": "Scheduled"
+    }).sort([("appointment_date", 1), ("appointment_time", 1)]))
+    
+    # Map patient_id -> next scheduled appointment string
+    next_appts = {}
+    for a in appts:
+        pid = a.get("patient_id")
+        if pid not in next_appts:
+            time_part = f" at {a.get('appointment_time')}" if a.get("appointment_time") else ""
+            next_appts[pid] = f"{a.get('appointment_date')}{time_part}"
+
+    # Group everything by Procedure
+    # Format: { procedure_name: { "in_progress": [], "planned": [], "completed": [] } }
+    dashboard_data = {}
+    
+    for pid, teeth in patient_tooth_states.items():
+        pname = patient_names.get(pid, "Unknown")
+        for tooth_id, state in teeth.items():
+            proc = state["procedure"]
+            status = state["status"] # planned, in_progress, completed
+            
+            # Map status key
+            if status == "completed":
+                key = "completed"
+            elif status == "planned":
+                key = "planned"
+            else:
+                key = "in_progress"
+                
+            if proc not in dashboard_data:
+                dashboard_data[proc] = {
+                    "in_progress": [],
+                    "planned": [],
+                    "completed": []
+                }
+                
+            # Upcoming follow-up/appointment date
+            upcoming = next_appts.get(pid)
+            if not upcoming:
+                if state["last_follow_up"] and state["last_follow_up"] >= now_str:
+                    upcoming = state["last_follow_up"]
+                else:
+                    upcoming = ""
+                    
+            dashboard_data[proc][key].append({
+                "patient_id": pid,
+                "patient_name": pname,
+                "tooth": tooth_id,
+                "session": state["session"],
+                "notes": state["notes"],
+                "last_visit": state["last_visit_date"],
+                "upcoming_date": upcoming,
+            })
+            
+    # Convert map to sorted list
+    output = []
+    for proc, stages in sorted(dashboard_data.items()):
+        output.append({
+            "procedure": proc,
+            "in_progress": stages["in_progress"],
+            "planned": stages["planned"],
+            "completed": stages["completed"],
+        })
+        
+    return jsonify(output), 200

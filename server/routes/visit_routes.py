@@ -5,6 +5,7 @@ from controllers.visit_controller import (
     get_patient_visits,
     get_patient_summary,
     search_diagnoses,
+    get_treatments_dashboard,
 )
 
 from middleware.auth_middleware import (
@@ -18,6 +19,13 @@ visit_bp = Blueprint("visit_bp", __name__)
 visit_bp.route("/", methods=["POST"])(
     token_required(
         role_required(["Doctor"])(create_visit)
+    )
+)
+
+# ── Treatments dashboard ───────────────────────────────────────────────────────
+visit_bp.route("/treatments/dashboard", methods=["GET"])(
+    token_required(
+        role_required(["Doctor"])(get_treatments_dashboard)
     )
 )
 
