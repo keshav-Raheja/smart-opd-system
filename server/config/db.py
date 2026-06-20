@@ -39,6 +39,18 @@ fee_config_collection.create_index([("doctor_id", ASCENDING), ("category", ASCEN
 visits_collection.create_index([("patient_id", ASCENDING)])
 visits_collection.create_index([("patient_id", ASCENDING), ("created_at", DESCENDING)])
 
+# ── Core collection indexes (safe & idempotent) ──────────────────────────────
+try:
+    users_collection.create_index([("email", ASCENDING)], unique=True)
+    patients_collection.create_index([("opd_id", ASCENDING)])
+    visits_collection.create_index([("opd_id", ASCENDING)])
+    appointments_collection.create_index([("opd_id", ASCENDING)])
+    appointments_collection.create_index([("appointment_date", ASCENDING)])
+    appointments_collection.create_index([("status", ASCENDING)])
+    appointments_collection.create_index([("patient_id", ASCENDING)])
+except Exception as e:
+    print(f"[DB Indexing] Core index creation skipped/failed: {e}")
+
 # ── Index for medicine fast search ─────────────────────────────────────────────
 try:
     medicines_collection.create_index([("name", ASCENDING)])

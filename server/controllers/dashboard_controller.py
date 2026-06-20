@@ -1,9 +1,5 @@
-"""
-dashboard_controller.py
-────────────────────────
-Revenue from bills collection. Stats are OPD-scoped for non-admin users.
-"""
-
+import threading
+import time
 from flask import jsonify, request
 from config.db import (
     patients_collection,
@@ -13,6 +9,25 @@ from config.db import (
 )
 
 reports_collection = db["reports"]
+
+_last_orphan_cleanup_time = 0
+
+def _run_orphan_cleanup_async():
+    try:
+        existing_ids = set(str(p["_id"]) for p in patients_collection.find({}, {"_id": 1}))
+
+        for col, key in [
+            (visits_collection,   "patient_id"),
+            (db["appointments"],  "patient_id"),
+            (bills_collection,    "patient_id"),
+        ]:
+            docs    = list(col.find({}, {key: 1}))
+            orphans = [d["_id"] for d in docs if d.get(key) and str(d[key]) not in existing_ids]
+            if orphans:
+                col.delete_many({"_id": {"$in": orphans}})
+                print(f"[Self-Healing] Pruned {len(orphans)} orphan documents from {col.name}")
+    except Exception as e:
+        print(f"[Self-Healing] Error: {e}")
 
 
 def get_dashboard_stats():
@@ -28,22 +43,12 @@ def get_dashboard_stats():
     else:
         base_filter = {"opd_id": "__none__"}
 
-    # ── Self-Healing: Auto-prune orphan documents (Admin only to avoid cross-OPD) ──
-    if role == "Admin":
-        try:
-            existing_ids = set(str(p["_id"]) for p in patients_collection.find({}, {"_id": 1}))
-
-            for col, key in [
-                (visits_collection,   "patient_id"),
-                (db["appointments"],  "patient_id"),
-                (bills_collection,    "patient_id"),
-            ]:
-                docs    = list(col.find({}, {key: 1}))
-                orphans = [d["_id"] for d in docs if d.get(key) and str(d[key]) not in existing_ids]
-                if orphans:
-                    col.delete_many({"_id": {"$in": orphans}})
-        except Exception as e:
-            print(f"[Self-Healing] Error: {e}")
+    # ── Self-Healing: Auto-prune orphan documents (Admin only, non-blocking in background, at most once per 12 hours) ──
+    global _last_orphan_cleanup_time
+    now_ts = time.time()
+    if role == "Admin" and (now_ts - _last_orphan_cleanup_time > 43200):
+        _last_orphan_cleanup_time = now_ts
+        threading.Thread(target=_run_orphan_cleanup_async, daemon=True).start()
 
     total_patients = patients_collection.count_documents(base_filter)
     total_visits   = visits_collection.count_documents(base_filter)

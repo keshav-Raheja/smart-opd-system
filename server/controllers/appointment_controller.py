@@ -1,9 +1,24 @@
+import threading
+import time
 from flask import jsonify, request
 from config.db import db
 from bson import ObjectId
 from datetime import datetime
 
 appointments_collection = db["appointments"]
+
+_last_appt_cleanup_time = 0
+
+def _run_appointment_cleanups():
+    _cleanup_expired_appointments()
+    _auto_complete_past_active_appointments()
+
+def _trigger_cleanup_routines_async():
+    global _last_appt_cleanup_time
+    now_ts = time.time()
+    if now_ts - _last_appt_cleanup_time > 600:
+        _last_appt_cleanup_time = now_ts
+        threading.Thread(target=_run_appointment_cleanups, daemon=True).start()
 
 
 def _opd_query():
@@ -96,8 +111,7 @@ def _auto_complete_past_active_appointments():
 
 
 def get_appointments():
-    _cleanup_expired_appointments()
-    _auto_complete_past_active_appointments()
+    _trigger_cleanup_routines_async()
     query = _opd_query()
     appointments = []
     for a in appointments_collection.find(query).sort("created_at", -1):
@@ -149,8 +163,7 @@ def delete_appointment(id):
 
 
 def get_today_appointments():
-    _cleanup_expired_appointments()
-    _auto_complete_past_active_appointments()
+    _trigger_cleanup_routines_async()
     today = datetime.now().strftime("%Y-%m-%d")
     query = {**_opd_query(), "appointment_date": today}
     appointments = []
