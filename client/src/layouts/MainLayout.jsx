@@ -1,4 +1,4 @@
-import { useContext, useState, useCallback } from "react";
+import { useContext, useState, useCallback, useEffect } from "react";
 import { useNavigate }  from "react-router-dom";
 import Sidebar          from "../components/Sidebar";
 import { AuthContext }  from "../context/AuthContext";
@@ -15,6 +15,23 @@ function MainLayout({ children }) {
   const { logout }     = useContext(AuthContext);
   const navigate       = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [recentPatients, setRecentPatients] = useState(() => {
+    return JSON.parse(localStorage.getItem("recent_patients") || "[]");
+  });
+
+  const refreshRecents = useCallback(() => {
+    setRecentPatients(JSON.parse(localStorage.getItem("recent_patients") || "[]"));
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("recent_patients_updated", refreshRecents);
+    window.addEventListener("storage", refreshRecents);
+    return () => {
+      window.removeEventListener("recent_patients_updated", refreshRecents);
+      window.removeEventListener("storage", refreshRecents);
+    };
+  }, [refreshRecents]);
 
   const openSidebar  = useCallback(() => setSidebarOpen(true),  []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -102,6 +119,63 @@ function MainLayout({ children }) {
 
           </div>
         </header>
+
+        {/* Memento Recently Visited Patients Ribbon */}
+        {recentPatients.length > 0 && (
+          <div style={{
+            background: "rgba(255, 255, 255, 0.75)",
+            backdropFilter: "blur(10px)",
+            borderBottom: "1px solid var(--color-border)",
+            padding: "8px 24px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            flexShrink: 0
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+              🕒 Memento:
+            </span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {recentPatients.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => navigate(`/patients/${p.id}`)}
+                  className="btn"
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: 650,
+                    cursor: "pointer",
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text-secondary)",
+                    boxShadow: "var(--shadow-sm)",
+                    transition: "all 0.15s ease",
+                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = "var(--color-accent)";
+                    e.currentTarget.style.color = "var(--color-accent)";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = "var(--color-border)";
+                    e.currentTarget.style.color = "var(--color-text-secondary)";
+                    e.currentTarget.style.transform = "none";
+                  }}
+                >
+                  👤 {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main className="page-content animate-fade-in">

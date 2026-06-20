@@ -41,9 +41,11 @@ def create_appointment():
 def _cleanup_expired_appointments():
     try:
         today = datetime.now().strftime("%Y-%m-%d")
-        appointments_collection.delete_many({
+        appointments_collection.update_many({
             "appointment_date": {"$lt": today},
             "status": "Scheduled"
+        }, {
+            "$set": {"status": "Cancelled"}
         })
     except Exception as e:
         print(f"[AppointmentController] Error in cleanup: {e}")

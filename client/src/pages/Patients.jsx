@@ -122,6 +122,7 @@ function Patients() {
             <Link
               key={patient._id}
               to={`/patients/${patient._id}`}
+              state={{ from: "/patients" }}
               className={`animate-fade-in stagger-${Math.min(i + 1, 4)}`}
               style={{ textDecoration: "none" }}
             >

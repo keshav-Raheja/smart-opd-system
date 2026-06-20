@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import MainLayout from "../layouts/MainLayout";
 import api from "../services/api";
 import ReportUpload from "../components/ReportUpload";
@@ -18,6 +18,7 @@ const VITALS_META = [
 function PatientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -149,6 +150,15 @@ function PatientProfile() {
     try {
       const response = await api.get(`/patients/${id}`);
       setPatient(response.data);
+      if (response.data && response.data._id) {
+        const recent = JSON.parse(localStorage.getItem("recent_patients") || "[]");
+        const updated = [
+          { id: response.data._id, name: response.data.name },
+          ...recent.filter(p => p.id !== response.data._id)
+        ].slice(0, 5);
+        localStorage.setItem("recent_patients", JSON.stringify(updated));
+        window.dispatchEvent(new Event("recent_patients_updated"));
+      }
     } catch (error) {
       toast.error("Error", "Could not load patient details");
     }
@@ -243,6 +253,39 @@ function PatientProfile() {
   return (
     <MainLayout>
       <div className="animate-fade-in">
+        <div style={{ marginBottom: 16 }}>
+          <button
+            onClick={() => {
+              const fromPath = location.state?.from;
+              if (fromPath === "/patients") {
+                navigate("/patients");
+              } else if (fromPath === "/treatments") {
+                navigate("/treatments");
+              } else {
+                navigate("/dashboard");
+              }
+            }}
+            className="btn btn-secondary"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 16px",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--shadow-sm)",
+              transition: "all 0.2s"
+            }}
+          >
+            {location.state?.from === "/patients" && "← Back to Patients"}
+            {location.state?.from === "/treatments" && "← Back to Treatment Tracker"}
+            {location.state?.from !== "/patients" && location.state?.from !== "/treatments" && "← Back to Dashboard"}
+          </button>
+        </div>
         {/* Patient Hero Card */}
         <div className="card" style={{ marginBottom: 20, padding: 28 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>

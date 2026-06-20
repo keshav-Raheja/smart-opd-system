@@ -9,6 +9,18 @@ function TreatmentDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedTreatment, setSelectedTreatment] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedSections, setExpandedSections] = useState({
+    inProgress: true,
+    planned: true,
+    completed: false
+  });
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -84,79 +96,197 @@ function TreatmentDashboard() {
             <h3 style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 14 }}>
               🦷 Procedure Groups
             </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {treatments.map((t) => {
                 const totalActive = t.in_progress.length + t.planned.length + t.completed.length;
                 const isSelected = selectedTreatment?.procedure === t.procedure;
                 const totalRemaining = t.in_progress.length + t.planned.length;
                 return (
-                  <div
-                    key={t.procedure}
-                    onClick={() => setSelectedTreatment(isSelected ? null : t)}
-                    className="card"
-                    style={{
-                      padding: 20,
-                      cursor: "pointer",
-                      border: isSelected ? "2.5px solid var(--color-accent)" : "1.5px solid var(--color-border)",
-                      boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
-                      background: isSelected ? "linear-gradient(180deg, var(--color-surface) 0%, rgba(59, 130, 246, 0.02) 100%)" : "var(--color-surface)",
-                      transition: "all 0.2s ease-in-out",
-                      transform: isSelected ? "translateY(-2px)" : "none",
-                      position: "relative",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                      <h4 style={{ fontSize: 16, fontWeight: 800, color: "var(--color-navy-950)", margin: 0 }}>
-                        {t.procedure}
-                      </h4>
-                      <span style={{ fontSize: 11, background: "var(--color-surface-3)", padding: "3px 8px", borderRadius: 12, fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
-                        {totalActive} cases
-                      </span>
-                    </div>
+                  <div key={t.procedure} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Procedure Card */}
+                    <div
+                      onClick={() => setSelectedTreatment(isSelected ? null : t)}
+                      className="card"
+                      style={{
+                        padding: 20,
+                        cursor: "pointer",
+                        border: isSelected ? "2.5px solid var(--color-accent)" : "1.5px solid var(--color-border)",
+                        boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
+                        background: isSelected ? "linear-gradient(180deg, var(--color-surface) 0%, rgba(59, 130, 246, 0.02) 100%)" : "var(--color-surface)",
+                        transition: "all 0.2s ease-in-out",
+                        transform: isSelected ? "translateY(-2px)" : "none",
+                        position: "relative",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                        <h4 style={{ fontSize: 16, fontWeight: 800, color: "var(--color-navy-950)", margin: 0 }}>
+                          {t.procedure}
+                        </h4>
+                        <span style={{ fontSize: 11, background: "var(--color-surface-3)", padding: "3px 8px", borderRadius: 12, fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
+                          {totalActive} cases
+                        </span>
+                      </div>
 
-                    <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                      {/* Remaining Panel */}
-                      <div style={{ flex: 1, background: "var(--color-surface-2)", padding: "10px 12px", borderRadius: 10, border: "1px solid #fed7aa" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.2px" }}>Remaining</div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
-                          <span style={{ fontSize: 20, fontWeight: 850, color: "#ea580c" }}>
-                            {totalRemaining}
-                          </span>
-                          <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600 }}>cases</span>
+                      <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
+                        {/* Remaining Panel */}
+                        <div style={{ flex: "1 1 120px", background: "var(--color-surface-2)", padding: "10px 12px", borderRadius: 10, border: "1px solid #fed7aa" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.2px" }}>Remaining</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
+                            <span style={{ fontSize: 20, fontWeight: 850, color: "#ea580c" }}>
+                              {totalRemaining}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600 }}>cases</span>
+                          </div>
+                          <div style={{ fontSize: 9, color: "var(--color-text-muted)", marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap", lineHeight: 1.2 }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#ea580c" }} />
+                              IP: {t.in_progress.length}
+                            </span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#d97706" }} />
+                              PL: {t.planned.length}
+                            </span>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 9, color: "var(--color-text-muted)", marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap", lineHeight: 1.2 }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#ea580c" }} />
-                            IP: {t.in_progress.length}
-                          </span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#d97706" }} />
-                            PL: {t.planned.length}
-                          </span>
+
+                        {/* Completed Panel */}
+                        <div style={{ flex: "1 1 120px", background: "var(--color-surface-2)", padding: "10px 12px", borderRadius: 10, border: "1px solid #a7f3d0" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.2px" }}>Completed</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
+                            <span style={{ fontSize: 20, fontWeight: 850, color: "var(--color-success)" }}>
+                              {t.completed.length}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600 }}>cases</span>
+                          </div>
+                          <div style={{ fontSize: 9, color: "var(--color-success)", marginTop: 4, fontWeight: 700 }}>
+                            ✓ Treated
+                          </div>
                         </div>
                       </div>
 
-                      {/* Completed Panel */}
-                      <div style={{ flex: 1, background: "var(--color-surface-2)", padding: "10px 12px", borderRadius: 10, border: "1px solid #a7f3d0" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.2px" }}>Completed</div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
-                          <span style={{ fontSize: 20, fontWeight: 850, color: "var(--color-success)" }}>
-                            {t.completed.length}
-                          </span>
-                          <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600 }}>cases</span>
+                      {/* Progress Bar Visualizer */}
+                      {totalActive > 0 && (
+                        <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", marginTop: 14, background: "var(--color-surface-3)" }}>
+                          <div style={{ width: `${(t.in_progress.length / totalActive) * 100}%`, background: "#ea580c" }} />
+                          <div style={{ width: `${(t.planned.length / totalActive) * 100}%`, background: "#d97706" }} />
+                          <div style={{ width: `${(t.completed.length / totalActive) * 100}%`, background: "var(--color-success)" }} />
                         </div>
-                        <div style={{ fontSize: 9, color: "var(--color-success)", marginTop: 4, fontWeight: 700 }}>
-                          ✓ Treated
-                        </div>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Progress Bar Visualizer */}
-                    {totalActive > 0 && (
-                      <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", marginTop: 14, background: "var(--color-surface-3)" }}>
-                        <div style={{ width: `${(t.in_progress.length / totalActive) * 100}%`, background: "#ea580c" }} />
-                        <div style={{ width: `${(t.planned.length / totalActive) * 100}%`, background: "#d97706" }} />
-                        <div style={{ width: `${(t.completed.length / totalActive) * 100}%`, background: "var(--color-success)" }} />
+                    {/* Inline Detailed Kanban View (Drilldown just below the card) */}
+                    {isSelected && (
+                      <div className="animate-slide-down" style={{ background: "var(--color-surface-3)", borderRadius: 16, padding: "20px 16px", border: "1px solid var(--color-border)", marginBottom: 12 }}>
+                        {/* Kanban Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 16 }}>
+                          <div>
+                            <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "var(--color-navy-950)", margin: 0 }}>
+                              📋 {t.procedure} Patient Workflow
+                            </h2>
+                            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 2 }}>
+                              Stage-by-stage patient lists. Click any card to navigate to the patient profile.
+                            </p>
+                          </div>
+                          {/* Search */}
+                          <input
+                            type="text"
+                            placeholder="🔍 Search patients, teeth, notes..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onClick={(e) => e.stopPropagation()} // Prevent card toggle when clicking search input
+                            className="form-input"
+                            style={{ maxWidth: 300, fontSize: 13, background: "var(--color-surface)" }}
+                          />
+                        </div>
+
+                        {/* Three Stacked Panels */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                          
+                          {/* 1. In Progress Patients (At the Top) */}
+                          <div className="card" style={{ background: "var(--color-surface)", borderRadius: 16, border: "1.5px solid #fed7aa", padding: 16 }}>
+                            <div 
+                              onClick={() => toggleSection("inProgress")}
+                              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: expandedSections.inProgress ? 16 : 0, cursor: "pointer", userSelect: "none" }}
+                            >
+                              <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 800, color: "#ea580c", margin: 0 }}>
+                                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ea580c" }} />
+                                In Progress Patients ({filterPatients(t.in_progress).length})
+                              </h3>
+                              <span style={{ fontSize: 14, color: "#ea580c", fontWeight: 700, transform: expandedSections.inProgress ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                                ▼
+                              </span>
+                            </div>
+                            {expandedSections.inProgress && (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+                                {filterPatients(t.in_progress).map((p) => (
+                                  <PatientKanbanCard key={`${p.patient_id}-${p.tooth}`} patient={p} themeColor="#ea580c" badgeBg="#ffedd5" />
+                                ))}
+                                {filterPatients(t.in_progress).length === 0 && (
+                                  <div style={{ gridColumn: "1 / -1" }}>
+                                    <EmptyColumnState message="No patients in progress" />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. Planned Patients (Planned just above Completed / Middle) */}
+                          <div className="card" style={{ background: "var(--color-surface)", borderRadius: 16, border: "1.5px solid #fef08a", padding: 16 }}>
+                            <div 
+                              onClick={() => toggleSection("planned")}
+                              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: expandedSections.planned ? 16 : 0, cursor: "pointer", userSelect: "none" }}
+                            >
+                              <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 800, color: "#d97706", margin: 0 }}>
+                                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#d97706" }} />
+                                Planned Patients ({filterPatients(t.planned).length})
+                              </h3>
+                              <span style={{ fontSize: 14, color: "#d97706", fontWeight: 700, transform: expandedSections.planned ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                                ▼
+                              </span>
+                            </div>
+                            {expandedSections.planned && (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+                                {filterPatients(t.planned).map((p) => (
+                                  <PatientKanbanCard key={`${p.patient_id}-${p.tooth}`} patient={p} themeColor="#d97706" badgeBg="#fef9c3" />
+                                ))}
+                                {filterPatients(t.planned).length === 0 && (
+                                  <div style={{ gridColumn: "1 / -1" }}>
+                                    <EmptyColumnState message="No planned patients" />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. Completed Patients (Completed at the bottom) */}
+                          <div className="card" style={{ background: "var(--color-surface)", borderRadius: 16, border: "1.5px solid #a7f3d0", padding: 16 }}>
+                            <div 
+                              onClick={() => toggleSection("completed")}
+                              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: expandedSections.completed ? 16 : 0, cursor: "pointer", userSelect: "none" }}
+                            >
+                              <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 800, color: "var(--color-success)", margin: 0 }}>
+                                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-success)" }} />
+                                Completed Patients ({filterPatients(t.completed).length})
+                              </h3>
+                              <span style={{ fontSize: 14, color: "var(--color-success)", fontWeight: 700, transform: expandedSections.completed ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                                ▼
+                              </span>
+                            </div>
+                            {expandedSections.completed && (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+                                {filterPatients(t.completed).map((p) => (
+                                  <PatientKanbanCard key={`${p.patient_id}-${p.tooth}`} patient={p} themeColor="var(--color-success)" badgeBg="#d1fae5" />
+                                ))}
+                                {filterPatients(t.completed).length === 0 && (
+                                  <div style={{ gridColumn: "1 / -1" }}>
+                                    <EmptyColumnState message="No completed patients" />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
                       </div>
                     )}
                   </div>
@@ -164,97 +294,6 @@ function TreatmentDashboard() {
               })}
             </div>
           </div>
-
-          {/* Drilldown Detailed Kanban View */}
-          {selectedTreatment && (
-            <div className="animate-fade-in" style={{ borderTop: "1px solid var(--color-border)", paddingTop: 24, marginTop: 12 }}>
-              {/* Kanban Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 16 }}>
-                <div>
-                  <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, color: "var(--color-navy-950)", margin: 0 }}>
-                    📋 {selectedTreatment.procedure} Patient Workflow
-                  </h2>
-                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>
-                    Stage-by-stage patient lists. Click any card to navigate to the patient profile.
-                  </p>
-                </div>
-                {/* Search */}
-                <input
-                  type="text"
-                  placeholder="🔍 Search patients, teeth, notes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="form-input"
-                  style={{ maxWidth: 300, fontSize: 13 }}
-                />
-              </div>
-
-              {/* Three Stacked Panels */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                
-                {/* 1. In Progress Patients (At the Top) */}
-                <div className="card" style={{ background: "var(--color-surface-2)", borderRadius: 16, border: "1.5px solid #fed7aa", padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 800, color: "#ea580c", margin: 0 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ea580c" }} />
-                      In Progress Patients ({filterPatients(selectedTreatment.in_progress).length})
-                    </h3>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
-                    {filterPatients(selectedTreatment.in_progress).map((p) => (
-                      <PatientKanbanCard key={`${p.patient_id}-${p.tooth}`} patient={p} themeColor="#ea580c" badgeBg="#ffedd5" />
-                    ))}
-                    {filterPatients(selectedTreatment.in_progress).length === 0 && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <EmptyColumnState message="No patients in progress" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Planned Patients (Planned just above Completed / Middle) */}
-                <div className="card" style={{ background: "var(--color-surface-2)", borderRadius: 16, border: "1.5px solid #fef08a", padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 800, color: "#d97706", margin: 0 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#d97706" }} />
-                      Planned Patients ({filterPatients(selectedTreatment.planned).length})
-                    </h3>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
-                    {filterPatients(selectedTreatment.planned).map((p) => (
-                      <PatientKanbanCard key={`${p.patient_id}-${p.tooth}`} patient={p} themeColor="#d97706" badgeBg="#fef9c3" />
-                    ))}
-                    {filterPatients(selectedTreatment.planned).length === 0 && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <EmptyColumnState message="No planned patients" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Completed Patients (Completed at the bottom) */}
-                <div className="card" style={{ background: "var(--color-surface-2)", borderRadius: 16, border: "1.5px solid #a7f3d0", padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 800, color: "var(--color-success)", margin: 0 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-success)" }} />
-                      Completed Patients ({filterPatients(selectedTreatment.completed).length})
-                    </h3>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
-                    {filterPatients(selectedTreatment.completed).map((p) => (
-                      <PatientKanbanCard key={`${p.patient_id}-${p.tooth}`} patient={p} themeColor="var(--color-success)" badgeBg="#d1fae5" />
-                    ))}
-                    {filterPatients(selectedTreatment.completed).length === 0 && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <EmptyColumnState message="No completed patients" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -266,6 +305,7 @@ function PatientKanbanCard({ patient, themeColor, badgeBg }) {
   return (
     <Link
       to={`/patients/${patient.patient_id}`}
+      state={{ from: "/treatments" }}
       style={{
         textDecoration: "none",
         color: "inherit",
