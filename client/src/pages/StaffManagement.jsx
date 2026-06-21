@@ -37,7 +37,16 @@ function StaffManagement() {
     setError("");
     try {
       const res = await api.get("/opd/my-clinic");
-      setClinic(res.data);
+      const data = res.data;
+      
+      // Fallback: If backend does not return is_head, compute it on the client
+      if (data && data.is_head === undefined) {
+        const headDoctorId = data.created_by || (data.doctors && data.doctors[0]);
+        const currentUserId = user.id || user.user_id;
+        data.is_head = headDoctorId && currentUserId && String(headDoctorId) === String(currentUserId);
+      }
+      
+      setClinic(data);
     } catch (e) {
       // Catch backend 400 when doctor has no clinic
       const msg = e.response?.data?.message || "Failed to load clinic details.";
