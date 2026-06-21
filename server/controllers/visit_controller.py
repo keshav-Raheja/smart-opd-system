@@ -223,6 +223,7 @@ def search_diagnoses():
 def get_treatments_dashboard():
     role   = request.user.get("role")
     opd_id = request.user.get("opd_id")
+    doctor_filter = request.args.get("doctor")
     
     # Non-admin: filter by OPD
     if role == "Admin":
@@ -238,8 +239,12 @@ def get_treatments_dashboard():
     patient_ids = list(patient_names.keys())
     
     # Get all visits for these patients, sorted by created_at ascending to build timeline progress
+    visits_query = {"patient_id": {"$in": patient_ids}}
+    if doctor_filter:
+        visits_query["doctor_name"] = doctor_filter
+
     visits = list(visits_collection.find(
-        {"patient_id": {"$in": patient_ids}}
+        visits_query
     ).sort("created_at", 1))
     
     # Track latest status per patient per tooth
@@ -276,11 +281,15 @@ def get_treatments_dashboard():
             
     # Now query future scheduled appointments for all these patients
     now_str = datetime.now().strftime("%Y-%m-%d")
-    appts = list(appointments_collection.find({
+    appt_query = {
         "patient_id": {"$in": patient_ids},
         "appointment_date": {"$gte": now_str},
         "status": "Scheduled"
-    }).sort([("appointment_date", 1), ("appointment_time", 1)]))
+    }
+    if doctor_filter:
+        appt_query["doctor_name"] = doctor_filter
+
+    appts = list(appointments_collection.find(appt_query).sort([("appointment_date", 1), ("appointment_time", 1)]))
     
     # Map patient_id -> next scheduled appointment string
     next_appts = {}

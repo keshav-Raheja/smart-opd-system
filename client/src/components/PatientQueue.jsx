@@ -14,9 +14,19 @@ function PatientQueue({ setSelectedPatient, selectedPatient, onQueueChange, refr
   const fetchQueue = async () => {
     try {
       const response = await api.get("/appointments/today");
-      const filtered = response.data.filter(
+      let filtered = response.data.filter(
         (item) => item.status === "Checked-In" || item.status === "In Consultation"
       );
+
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      if (user.role === "Doctor") {
+        const loggedInDocName = (user.name || "").toLowerCase().replace(/^dr\.\s*/i, "").trim();
+        filtered = filtered.filter((item) => {
+          const apptDocName = (item.doctor_name || "").toLowerCase().replace(/^dr\.\s*/i, "").trim();
+          return apptDocName === loggedInDocName || apptDocName.includes(loggedInDocName) || loggedInDocName.includes(apptDocName);
+        });
+      }
+
       setAppointments(filtered);
       onQueueChange?.(filtered);
     } catch (error) {

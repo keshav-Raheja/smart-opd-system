@@ -154,8 +154,18 @@ function Sidebar({ isOpen = false, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const canAccess = (section) =>
-    ROLE_ACCESS[section]?.includes(user?.role);
+  const canAccess = (section) => {
+    if (user?.role === "Doctor") {
+      // If clinic is not set up yet, allow access to setup page
+      if (!user.opd_id) return ROLE_ACCESS[section]?.includes(user?.role);
+      
+      // If it is set up but they are not the head doctor, limit access
+      if (!user.is_head) {
+        return ["dashboard", "doctorPanel", "treatmentDashboard"].includes(section);
+      }
+    }
+    return ROLE_ACCESS[section]?.includes(user?.role);
+  };
 
   const handleLogout = () => {
     logout();

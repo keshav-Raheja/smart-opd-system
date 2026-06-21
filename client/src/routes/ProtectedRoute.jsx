@@ -4,11 +4,12 @@ import { Navigate } from "react-router-dom";
 const ProtectedRoute = ({
   children,
   allowedRoles = [],
+  routeKey,
 }) => {
   const token = localStorage.getItem("token");
 
   const user = JSON.parse(
-    localStorage.getItem("user")
+    localStorage.getItem("user") || "null"
   );
 
   if (!token || !user) {
@@ -20,6 +21,14 @@ const ProtectedRoute = ({
     !allowedRoles.includes(user.role)
   ) {
     return <Navigate to="/unauthorized" />;
+  }
+
+  // Secondary doctor page access restriction
+  if (user.role === "Doctor" && user.opd_id && !user.is_head) {
+    const allowedKeys = ["dashboard", "doctorPanel", "treatmentDashboard"];
+    if (routeKey && !allowedKeys.includes(routeKey)) {
+      return <Navigate to="/unauthorized" />;
+    }
   }
 
   return children;

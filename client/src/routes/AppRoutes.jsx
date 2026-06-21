@@ -67,7 +67,7 @@ function AppRoutes() {
         <Route
           path="/patients"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST]}>
+            <ProtectedRoute routeKey="patients" allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST]}>
               <MainLayout>
                 <Patients />
               </MainLayout>
@@ -89,7 +89,7 @@ function AppRoutes() {
         <Route
           path="/appointments"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST]}>
+            <ProtectedRoute routeKey="appointments" allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST]}>
               <MainLayout>
                 <Appointments />
               </MainLayout>
@@ -125,7 +125,7 @@ function AppRoutes() {
         <Route
           path="/staff-management"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.DOCTOR, ROLES.ADMIN]}>
+            <ProtectedRoute routeKey="staffManagement" allowedRoles={[ROLES.DOCTOR, ROLES.ADMIN]}>
               <MainLayout>
                 <StaffManagement />
               </MainLayout>
@@ -137,7 +137,7 @@ function AppRoutes() {
         <Route
           path="/ai-support"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF]}>
+            <ProtectedRoute routeKey="aiSupport" allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.LAB_STAFF]}>
               <MainLayout>
                 <AIReportSupport />
               </MainLayout>
@@ -149,7 +149,7 @@ function AppRoutes() {
         <Route
           path="/billing"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST]}>
+            <ProtectedRoute routeKey="billing" allowedRoles={[ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST]}>
               <MainLayout>
                 <Billing />
               </MainLayout>
@@ -161,7 +161,7 @@ function AppRoutes() {
         <Route
           path="/fee-config"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <ProtectedRoute routeKey="feeConfig" allowedRoles={[ROLES.ADMIN]}>
               <MainLayout>
                 <FeeConfig />
               </MainLayout>
@@ -173,7 +173,7 @@ function AppRoutes() {
         <Route
           path="/my-fees"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.DOCTOR]}>
+            <ProtectedRoute routeKey="myFeeConfig" allowedRoles={[ROLES.DOCTOR]}>
               <MainLayout>
                 <MyFeeConfig />
               </MainLayout>
@@ -185,7 +185,7 @@ function AppRoutes() {
         <Route
           path="/opd-management"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <ProtectedRoute routeKey="opdManagement" allowedRoles={[ROLES.ADMIN]}>
               <MainLayout>
                 <OpdManagement />
               </MainLayout>

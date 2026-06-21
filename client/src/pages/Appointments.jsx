@@ -25,6 +25,7 @@ const Appointments = () => {
     status: "Scheduled",
   });
   const [patients, setPatients] = useState([]);
+  const [doctorsList, setDoctorsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState("All");
@@ -187,6 +188,20 @@ const Appointments = () => {
       
       const patRes = await api.get("/patients/");
       setPatients(patRes.data);
+
+      try {
+        const clinicRes = await api.get("/opd/my-clinic");
+        const docs = clinicRes.data?.doctors_detail || [];
+        setDoctorsList(docs);
+        if (docs.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            doctor_name: prev.doctor_name || docs[0].name
+          }));
+        }
+      } catch (err) {
+        console.warn("Could not load clinic doctors:", err.response?.data?.message || err.message);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -624,16 +639,43 @@ const Appointments = () => {
               
               <div className="grid-form-2" style={{ marginBottom: 14 }}>
                 <div className="form-group">
-                  <label className="form-label">Doctor Name *</label>
-                  <input
-                    type="text"
-                    name="doctor_name"
-                    value={formData.doctor_name}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder="e.g. Mukherjee"
-                    required
-                  />
+                  <label className="form-label">Doctor Assigned *</label>
+                  {doctorsList.length > 1 ? (
+                    <select
+                      name="doctor_name"
+                      value={formData.doctor_name}
+                      onChange={handleChange}
+                      className="form-input form-select"
+                      required
+                    >
+                      <option value="">Select Doctor...</option>
+                      {doctorsList.map((doc) => (
+                        <option key={doc._id} value={doc.name}>
+                          Dr. {doc.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : doctorsList.length === 1 ? (
+                    <input
+                      type="text"
+                      name="doctor_name"
+                      value={formData.doctor_name || doctorsList[0].name}
+                      readOnly
+                      className="form-input"
+                      style={{ background: "var(--color-surface-2)", cursor: "not-allowed" }}
+                      required
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      name="doctor_name"
+                      value={formData.doctor_name}
+                      onChange={handleChange}
+                      className="form-input"
+                      placeholder="e.g. Mukherjee"
+                      required
+                    />
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Appointment Date *</label>
@@ -1104,13 +1146,38 @@ const Appointments = () => {
                   {/* Doctor Info */}
                   <div className="form-group">
                     <label className="form-label" style={{ fontSize: "11px", fontWeight: 700 }}>Doctor Assigned *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editForm.doctor_name}
-                      onChange={(e) => setEditForm({ ...editForm, doctor_name: e.target.value })}
-                      required
-                    />
+                    {doctorsList.length > 1 ? (
+                      <select
+                        className="form-input form-select"
+                        value={editForm.doctor_name}
+                        onChange={(e) => setEditForm({ ...editForm, doctor_name: e.target.value })}
+                        required
+                      >
+                        <option value="">Select Doctor...</option>
+                        {doctorsList.map((doc) => (
+                          <option key={doc._id} value={doc.name}>
+                            Dr. {doc.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : doctorsList.length === 1 ? (
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={editForm.doctor_name || doctorsList[0].name}
+                        readOnly
+                        style={{ background: "var(--color-surface-2)", cursor: "not-allowed" }}
+                        required
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={editForm.doctor_name}
+                        onChange={(e) => setEditForm({ ...editForm, doctor_name: e.target.value })}
+                        required
+                      />
+                    )}
                   </div>
 
                   {/* Date & Time */}

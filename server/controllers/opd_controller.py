@@ -187,6 +187,9 @@ def get_my_clinic():
     if isinstance(opd.get("created_at"), datetime.datetime):
         opd["created_at"] = opd["created_at"].isoformat()
 
+    head_doctor_id = opd.get("created_by") or (opd.get("doctors")[0] if opd.get("doctors") else None)
+    opd["is_head"] = (head_doctor_id == user.get("user_id"))
+
     # Enrich doctor list
     doctors = []
     for uid in (opd.get("doctors") or []):
@@ -266,6 +269,7 @@ def setup_clinic():
             "opd_id":   new_opd_id,
             "opd_type": opd_type,
             "opd_name": name,
+            "is_head":  True,
             "exp":      datetime.datetime.utcnow() + datetime.timedelta(days=1),
         },
         JWT_SECRET,
@@ -283,5 +287,89 @@ def setup_clinic():
             "opd_id":   new_opd_id,
             "opd_type": opd_type,
             "opd_name": name,
+            "is_head":  True,
         }
     }), 201
+
+
+def update_my_clinic():
+    user = request.user
+    opd_id = user.get("opd_id")
+    role = user.get("role")
+
+    if role != "Doctor":
+        return jsonify({"message": "Only doctors can update their clinic details"}), 403
+
+    if not opd_id:
+        return jsonify({"message": "No clinic associated with your account"}), 400
+
+    # Ensure only the head doctor/creator can update clinic details
+    opd = opds_collection.find_one({"_id": ObjectId(opd_id)})
+    if not opd:
+        return jsonify({"message": "Clinic not found"}), 404
+    head_doctor_id = opd.get("created_by") or (opd.get("doctors")[0] if opd.get("doctors") else None)
+    if head_doctor_id != user.get("user_id"):
+        return jsonify({"message": "Only the clinic head doctor can update clinic details"}), 403
+
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    opd_type = data.get("type", "General").strip()
+    address = data.get("address", "").strip()
+    contact = data.get("contact", "").strip()
+
+    if not name:
+        return jsonify({"message": "Clinic Name is required"}), 400
+
+    # Check if clinic name already exists for ANOTHER clinic (case-insensitive)
+    existing_opd = opds_collection.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
+    if existing_opd and str(existing_opd["_id"]) != opd_id:
+        return jsonify({"message": f"A clinic with the name '{name}' already exists"}), 400
+
+    # Update OPD doc
+    update_fields = {
+        "name": name,
+        "type": opd_type,
+        "address": address,
+        "contact": contact,
+    }
+    opds_collection.update_one({"_id": ObjectId(opd_id)}, {"$set": update_fields})
+
+    # Update user's opd_type in users_collection if it changed
+    users_collection.update_one(
+        {"_id": ObjectId(user.get("user_id"))},
+        {"$set": {"opd_type": opd_type}}
+    )
+
+    # Fetch updated user doc to return new token
+    updated_user = users_collection.find_one({"_id": ObjectId(user.get("user_id"))})
+
+    token = jwt.encode(
+        {
+            "user_id":  str(updated_user["_id"]),
+            "name":     updated_user["name"],
+            "email":    updated_user["email"],
+            "role":     updated_user.get("role", "Doctor"),
+            "opd_id":   opd_id,
+            "opd_type": opd_type,
+            "opd_name": name,
+            "is_head":  True,
+            "exp":      datetime.datetime.utcnow() + datetime.timedelta(days=1),
+        },
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+
+    return jsonify({
+        "message": "Clinic details updated successfully",
+        "token":   token,
+        "user": {
+            "id":       str(updated_user["_id"]),
+            "name":     updated_user["name"],
+            "email":    updated_user["email"],
+            "role":     updated_user.get("role", "Doctor"),
+            "opd_id":   opd_id,
+            "opd_type": opd_type,
+            "opd_name": name,
+            "is_head":  True,
+        }
+    }), 200

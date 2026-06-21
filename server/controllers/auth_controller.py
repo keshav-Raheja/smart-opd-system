@@ -71,12 +71,12 @@ def register():
     user_res = users_collection.insert_one(user_data)
     user_id = str(user_res.inserted_id)
 
-    # If Doctor, link to the created OPD
+    # If Doctor, link to the created OPD and set as creator
     if role == "Doctor" and opd_id:
         from bson import ObjectId
         opds_collection.update_one(
             {"_id": ObjectId(opd_id)},
-            {"$addToSet": {"doctors": user_id}}
+            {"$addToSet": {"doctors": user_id}, "$set": {"created_by": user_id}}
         )
 
     return jsonify({"message": "User registered successfully"}), 201
@@ -118,14 +118,18 @@ def login():
     opd_id   = user.get("opd_id")
     opd_type = user.get("opd_type")
     opd_name = None
+    is_head = False
 
     if opd_id:
         try:
             from bson import ObjectId
-            opd_doc = opds_collection.find_one({"_id": ObjectId(opd_id)}, {"name": 1, "type": 1})
+            opd_doc = opds_collection.find_one({"_id": ObjectId(opd_id)})
             if opd_doc:
                 opd_name = opd_doc.get("name")
                 opd_type = opd_doc.get("type", opd_type)
+                # Check is_head
+                head_doctor_id = opd_doc.get("created_by") or (opd_doc.get("doctors")[0] if opd_doc.get("doctors") else None)
+                is_head = (head_doctor_id == str(user["_id"]))
         except Exception:
             pass
 
@@ -138,6 +142,7 @@ def login():
             "opd_id":   opd_id,
             "opd_type": opd_type,
             "opd_name": opd_name,
+            "is_head":  is_head,
             "exp":      datetime.datetime.utcnow() + datetime.timedelta(days=1),
         },
         JWT_SECRET,
@@ -155,6 +160,7 @@ def login():
             "opd_id":   opd_id,
             "opd_type": opd_type,
             "opd_name": opd_name,
+            "is_head":  is_head,
         },
     }), 200
 
@@ -249,3 +255,111 @@ def delete_receptionist(receptionist_id):
         )
 
     return jsonify({"message": "Receptionist deleted successfully"}), 200
+
+
+def create_doctor():
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password")
+
+    if not name or not email or not password:
+        return jsonify({"message": "Name, email, and password are required"}), 400
+
+    creator = request.user
+    creator_opd_id = creator.get("opd_id")
+    creator_opd_type = creator.get("opd_type")
+
+    if not creator_opd_id:
+        return jsonify({"message": "You must be associated with a clinic to create a doctor"}), 400
+
+    # Only allow OPD creator / head doctor to create another doctor
+    from bson import ObjectId
+    opd = opds_collection.find_one({"_id": ObjectId(creator_opd_id)})
+    if not opd:
+        return jsonify({"message": "OPD clinic not found"}), 404
+
+    # Fallback owner check if created_by is missing
+    head_doctor_id = opd.get("created_by") or (opd.get("doctors")[0] if opd.get("doctors") else None)
+    if head_doctor_id != creator.get("user_id"):
+        return jsonify({"message": "Only the clinic head doctor can add other doctors"}), 403
+
+    # Check if user already exists
+    existing_user = users_collection.find_one({"email": email})
+    if existing_user:
+        return jsonify({"message": "A user with this email already exists"}), 400
+
+    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+    doctor_data = {
+        "name": name,
+        "email": email,
+        "password": hashed_password,
+        "role": "Doctor",
+        "opd_id": creator_opd_id,
+        "opd_type": creator_opd_type,
+        "created_at": datetime.datetime.utcnow(),
+    }
+
+    result = users_collection.insert_one(doctor_data)
+    doctor_id = str(result.inserted_id)
+
+    # Link doctor to the creator's OPD
+    opds_collection.update_one(
+        {"_id": ObjectId(creator_opd_id)},
+        {"$addToSet": {"doctors": doctor_id}}
+    )
+
+    return jsonify({
+        "message": "Doctor account created successfully",
+        "doctor": {
+            "id": doctor_id,
+            "name": name,
+            "email": email,
+            "role": "Doctor",
+            "opd_id": creator_opd_id,
+            "opd_type": creator_opd_type
+        }
+    }), 201
+
+
+def delete_doctor(doctor_id):
+    user = request.user
+    role = user.get("role")
+    doctor_opd_id = user.get("opd_id")
+
+    from bson import ObjectId
+    try:
+        doctor_to_del = users_collection.find_one({"_id": ObjectId(doctor_id)})
+    except Exception:
+        return jsonify({"message": "Invalid doctor ID"}), 400
+
+    if not doctor_to_del:
+        return jsonify({"message": "Doctor not found"}), 404
+
+    if doctor_to_del.get("role") != "Doctor":
+        return jsonify({"message": "User is not a doctor"}), 400
+
+    # Only the clinic creator (head doctor) can delete other doctors
+    opd = opds_collection.find_one({"_id": ObjectId(doctor_opd_id)})
+    if not opd:
+        return jsonify({"message": "Clinic not found"}), 404
+        
+    head_doctor_id = opd.get("created_by") or (opd.get("doctors")[0] if opd.get("doctors") else None)
+    if head_doctor_id != user.get("user_id"):
+        return jsonify({"message": "Only the clinic head doctor can delete other doctors"}), 403
+
+    # Check that head doctor cannot delete themselves
+    if doctor_id == user.get("user_id"):
+        return jsonify({"message": "You cannot delete your own head doctor account. If you want to delete the clinic, contact Admin."}), 400
+
+    # Delete the user document
+    users_collection.delete_one({"_id": ObjectId(doctor_id)})
+
+    # Remove from OPD's doctors array
+    opds_collection.update_one(
+        {"_id": ObjectId(doctor_opd_id)},
+        {"$pull": {"doctors": doctor_id}}
+    )
+
+    return jsonify({"message": "Doctor deleted successfully"}), 200
