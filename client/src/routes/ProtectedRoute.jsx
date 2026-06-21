@@ -24,7 +24,7 @@ const ProtectedRoute = ({
   }
 
   // Secondary doctor page access restriction
-  if (user.role === "Doctor" && user.opd_id && !user.is_head) {
+  if (user.role === "Doctor" && user.opd_id && user.is_head === false) {
     const allowedKeys = ["dashboard", "doctorPanel", "treatmentDashboard"];
     if (routeKey && !allowedKeys.includes(routeKey)) {
       return <Navigate to="/unauthorized" />;

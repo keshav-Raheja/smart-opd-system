@@ -160,7 +160,7 @@ function Sidebar({ isOpen = false, onClose }) {
       if (!user.opd_id) return ROLE_ACCESS[section]?.includes(user?.role);
       
       // If it is set up but they are not the head doctor, limit access
-      if (!user.is_head) {
+      if (user.is_head === false) {
         return ["dashboard", "doctorPanel", "treatmentDashboard"].includes(section);
       }
     }

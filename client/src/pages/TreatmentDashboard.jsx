@@ -88,26 +88,23 @@ function TreatmentDashboard() {
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {doctorsList.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
-                👤 Doctor:
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
+                👤 Filter by Doctor:
               </span>
               <select
                 value={selectedDoctor}
                 onChange={(e) => setSelectedDoctor(e.target.value)}
                 className="form-input form-select"
                 style={{
-                  padding: "6px 32px 6px 12px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  height: 38,
                   width: "auto",
-                  minWidth: 160,
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text-primary)",
-                  boxShadow: "var(--shadow-sm)",
+                  minWidth: "180px",
+                  height: "40px",
+                  fontWeight: 600,
+                  fontSize: "13px",
                   cursor: "pointer",
+                  border: "1.5px solid var(--color-border)",
+                  borderRadius: "10px",
+                  padding: "0 36px 0 12px",
                 }}
               >
                 <option value="All Doctors">All Doctors</option>
@@ -122,7 +119,7 @@ function TreatmentDashboard() {
           <button
             onClick={() => fetchDashboardData()}
             className="btn btn-secondary"
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", height: 38 }}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 16px", borderRadius: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", height: "40px" }}
           >
             🔄 Refresh
           </button>
