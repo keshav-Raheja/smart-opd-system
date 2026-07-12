@@ -144,12 +144,33 @@ export default function DentalChart({ chart = {}, onChange, readOnly = false, to
   };
 
   const handleChange = (tooth, field, value) => {
+    let extraFields = {};
+    if (field === "procedure" && value) {
+      const hist = toothHistory[tooth] || [];
+      const matchingHist = hist.filter(h => h.procedure === value);
+      const nextVisitNum = matchingHist.length + 1;
+      
+      // Auto-populate Visit / Stage as "Visit N"
+      extraFields.session = `Visit ${nextVisitNum}`;
+      
+      // Try to find the most recent planned_visits count for this procedure on this tooth
+      const lastWithPlanned = [...matchingHist].reverse().find(h => h.planned_visits);
+      if (lastWithPlanned) {
+        extraFields.planned_visits = lastWithPlanned.planned_visits;
+      }
+      
+      if (!chart[tooth]?.status) {
+        extraFields.status = "in_progress";
+      }
+    }
+
     const updated = {
       ...chart,
       [tooth]: {
         ...(chart[tooth] || {}),
         [field]: value,
-        ...((field === "procedure" && value && !(chart[tooth]?.status)) ? { status: "in_progress" } : {}),
+        ...extraFields,
+        ...((field === "procedure" && value && !extraFields.status && !(chart[tooth]?.status)) ? { status: "in_progress" } : {}),
         ...((field === "status") ? { done: value === "completed" || value === "in_progress" } : {}),
       },
     };
@@ -172,7 +193,7 @@ export default function DentalChart({ chart = {}, onChange, readOnly = false, to
     return (
       <div
         onClick={() => handleToothClick(tooth)}
-        title={`Tooth #${tooth}${proc ? ` — ${proc}` : ""}`}
+        title={`Tooth #${tooth}${proc ? ` — ${proc}` : ""}${chart[tooth]?.planned_visits ? ` (${chart[tooth].planned_visits} visits)` : ""}`}
         style={{
           width: 36, height: 44,
           border: `2px solid ${isActive ? "#2563eb" : s.border}`,
@@ -286,6 +307,21 @@ export default function DentalChart({ chart = {}, onChange, readOnly = false, to
                     placeholder="e.g. Visit 1, Crown prep..."
                     value={activeChartEntry.session || ""}
                     onChange={e => handleChange(active, "session", e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Planned Visits Input */}
+              {activeChartEntry.procedure && (
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-secondary)" }}>Planned Visits</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    placeholder="e.g. 3"
+                    value={activeChartEntry.planned_visits || ""}
+                    onChange={e => handleChange(active, "planned_visits", parseInt(e.target.value) || "")}
                   />
                 </div>
               )}
@@ -404,6 +440,9 @@ export default function DentalChart({ chart = {}, onChange, readOnly = false, to
                         {h.session && (
                           <span style={{ color: "#d97706", fontWeight: 700, marginLeft: 6 }}>({h.session})</span>
                         )}
+                        {h.planned_visits && (
+                          <span style={{ color: "var(--color-navy-600)", fontWeight: 700, marginLeft: 6 }}>({h.planned_visits} visits)</span>
+                        )}
                         {h.notes && (
                           <span style={{ color: "var(--color-text-secondary)", fontSize: 11, display: "block", marginTop: 2 }}>
                             Note: {h.notes}
@@ -441,6 +480,9 @@ export default function DentalChart({ chart = {}, onChange, readOnly = false, to
                       <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{e.procedure}</span>
                       {e.session && (
                         <span style={{ color: "#d97706", fontWeight: 700, marginLeft: 6 }}>({e.session})</span>
+                      )}
+                      {e.planned_visits && (
+                        <span style={{ color: "var(--color-navy-600)", fontWeight: 700, marginLeft: 6 }}>({e.planned_visits} visits)</span>
                       )}
                       {e.notes && <span style={{ color: "var(--color-text-muted)", marginLeft: 8 }}>— {e.notes}</span>}
                     </div>

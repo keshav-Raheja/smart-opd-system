@@ -172,3 +172,115 @@ def get_today_appointments():
         a["duration"] = int(a.get("duration", 15))
         appointments.append(a)
     return jsonify(appointments)
+
+
+def bulk_schedule_appointments():
+    data = request.json or {}
+    patient_id = data.get("patient_id")
+    patient_name = data.get("patient_name")
+    visits = data.get("visits", [])
+    buffer_minutes = int(data.get("buffer_minutes", 15))
+    opd_id = request.user.get("opd_id")
+
+    if not patient_id or not patient_name or not visits:
+        return jsonify({"message": "patient_id, patient_name, and visits are required"}), 400
+
+    # Parse and validate proposed visits
+    parsed_proposed = []
+    for idx, v in enumerate(visits):
+        date_str = v.get("date", "").strip()
+        time_str = v.get("time", "").strip()
+        try:
+            duration = int(v.get("duration", 15))
+        except ValueError:
+            duration = 15
+        reason = v.get("reason", "").strip()
+
+        if not date_str or not time_str:
+            return jsonify({"message": f"Visit {idx+1} is missing date or time"}), 400
+
+        # Convert time string (HH:MM) to minutes
+        try:
+            h, m = map(int, time_str.split(":"))
+            start_min = h * 60 + m
+        except Exception:
+            return jsonify({"message": f"Visit {idx+1} has invalid time format (use HH:MM)"}), 400
+
+        parsed_proposed.append({
+            "idx": idx + 1,
+            "date": date_str,
+            "time": time_str,
+            "start": start_min,
+            "end": start_min + duration,
+            "end_buffered": start_min + duration + buffer_minutes,
+            "duration": duration,
+            "reason": reason
+        })
+
+    # Check conflicts within the proposed batch itself
+    for i in range(len(parsed_proposed)):
+        for j in range(i + 1, len(parsed_proposed)):
+            p1 = parsed_proposed[i]
+            p2 = parsed_proposed[j]
+            if p1["date"] == p2["date"]:
+                # Check overlap
+                if max(p1["start"], p2["start"]) < min(p1["end_buffered"], p2["end_buffered"]):
+                    p1_end_str = f"{(p1['end_buffered'])//60:02d}:{(p1['end_buffered'])%60:02d}"
+                    p2_end_str = f"{(p2['end_buffered'])//60:02d}:{(p2['end_buffered'])%60:02d}"
+                    return jsonify({
+                        "message": f"Conflict in proposed batch: Visit {p1['idx']} ({p1['time']} - {p1_end_str}) and Visit {p2['idx']} ({p2['time']} - {p2_end_str}) overlap on {p1['date']} (including buffer)."
+                    }), 400
+
+    # Query all existing appointments for the same opd_id on the proposed dates
+    proposed_dates = list(set(p["date"] for p in parsed_proposed))
+    existing_appts = list(appointments_collection.find({
+        "opd_id": opd_id,
+        "appointment_date": {"$in": proposed_dates},
+        "status": {"$ne": "Cancelled"}
+    }))
+
+    # Check conflicts against existing database records
+    for p in parsed_proposed:
+        for e in existing_appts:
+            if e.get("appointment_date") == p["date"]:
+                e_time = e.get("appointment_time")
+                try:
+                    eh, em = map(int, e_time.split(":"))
+                    e_start = eh * 60 + em
+                    e_duration = int(e.get("duration", 15))
+                    e_end_buffered = e_start + e_duration + buffer_minutes
+                except Exception:
+                    continue  # skip invalid times in DB
+
+                # Check overlap
+                if max(p["start"], e_start) < min(p["end_buffered"], e_end_buffered):
+                    e_end_time_str = f"{(e_end_buffered)//60:02d}:{(e_end_buffered)%60:02d}"
+                    p_end_time_str = f"{(p['end_buffered'])//60:02d}:{(p['end_buffered'])%60:02d}"
+                    return jsonify({
+                        "message": f"Conflict on {p['date']}: You already have a booking from {e_time} to {e_end_time_str} (Patient: {e.get('patient_name')}) that conflicts with proposed slot {p['time']} to {p_end_time_str} (includes {buffer_minutes} min buffer)."
+                    }), 400
+
+    # No conflicts found! Insert all proposed appointments
+    created_appts = []
+    for p in parsed_proposed:
+        appt = {
+            "patient_id": patient_id,
+            "patient_name": patient_name,
+            "doctor_name": request.user.get("name", "Doctor"),
+            "appointment_date": p["date"],
+            "appointment_time": p["time"],
+            "duration": p["duration"],
+            "status": "Scheduled",
+            "reason": p["reason"],
+            "opd_id": opd_id,
+            "created_at": datetime.utcnow()
+        }
+        appointments_collection.insert_one(appt)
+        created_appts.append(appt)
+
+    # Convert ObjectIds and datetimes
+    for a in created_appts:
+        a["_id"] = str(a["_id"])
+        a["created_at"] = a["created_at"].isoformat()
+
+    return jsonify({"message": f"Successfully scheduled {len(created_appts)} visits.", "appointments": created_appts}), 201

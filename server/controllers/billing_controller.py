@@ -65,6 +65,10 @@ def _serialize(doc: dict) -> dict:
     for field in ("created_at", "updated_at"):
         if field in doc and hasattr(doc[field], "isoformat"):
             doc[field] = doc[field].isoformat()
+    if "payment_history" in doc and isinstance(doc["payment_history"], list):
+        for p in doc["payment_history"]:
+            if "created_at" in p and hasattr(p["created_at"], "isoformat"):
+                p["created_at"] = p["created_at"].isoformat()
     return doc
 
 
@@ -171,6 +175,15 @@ def create_bill():
         payment_status = "Pending"
 
     now = datetime.now(timezone.utc)
+    payment_history = []
+    if amount_paid > 0:
+        payment_history.append({
+            "amount": round(amount_paid, 2),
+            "payment_method": data.get("payment_method", "Cash"),
+            "notes": "Initial payment",
+            "created_at": now
+        })
+
     doc = {
         "bill_number":    _generate_bill_number(),
         "patient_id":     patient_id,
@@ -189,6 +202,7 @@ def create_bill():
         "payment_method": data.get("payment_method"),
         "amount_paid":    round(amount_paid, 2),
         "amount_due":     max(amount_due, 0),
+        "payment_history": payment_history,
         "notes":          data.get("notes", "").strip(),
         "opd_id":         request.user.get("opd_id"),   # OPD scope tag
         "created_at":     now,
@@ -457,3 +471,183 @@ def get_revenue_stats():
         "by_status": by_status,
         "by_month":  by_month,
     }), 200
+
+
+# ─────────────────────────────────────────────────────────────
+# POST /api/billing/<bill_id>/installment → record installment
+# ─────────────────────────────────────────────────────────────
+def record_installment(bill_id):
+    data = request.json or {}
+    try:
+        bill = bills_collection.find_one({"_id": ObjectId(bill_id)})
+    except InvalidId:
+        return jsonify({"message": "Invalid bill ID"}), 400
+
+    if not bill:
+        return jsonify({"message": "Bill not found"}), 404
+
+    try:
+        amount = float(data.get("amount", 0))
+        if amount <= 0:
+            return jsonify({"message": "Amount must be a positive number"}), 400
+    except (TypeError, ValueError):
+        return jsonify({"message": "Amount must be a positive number"}), 400
+
+    payment_method = data.get("payment_method", "Cash")
+    if payment_method not in VALID_PAYMENT_METHODS:
+        return jsonify({"message": f"payment_method must be one of {VALID_PAYMENT_METHODS}"}), 400
+
+    notes = data.get("notes", "").strip()
+
+    now = datetime.now(timezone.utc)
+    new_payment = {
+        "amount": round(amount, 2),
+        "payment_method": payment_method,
+        "notes": notes,
+        "created_at": now
+    }
+
+    payment_history = bill.get("payment_history", [])
+    if not isinstance(payment_history, list):
+        payment_history = []
+    payment_history.append(new_payment)
+
+    new_amount_paid = round(bill.get("amount_paid", 0) + amount, 2)
+    total_amount = bill.get("total_amount", 0)
+    new_amount_due = max(round(total_amount - new_amount_paid, 2), 0)
+
+    if new_amount_paid >= total_amount and total_amount > 0:
+        payment_status = "Paid"
+    elif new_amount_paid > 0:
+        payment_status = "Partial"
+    else:
+        payment_status = "Pending"
+
+    updates = {
+        "payment_history": payment_history,
+        "amount_paid": new_amount_paid,
+        "amount_due": new_amount_due,
+        "payment_status": payment_status,
+        "updated_at": now
+    }
+
+    result = bills_collection.find_one_and_update(
+        {"_id": ObjectId(bill_id)},
+        {"$set": updates},
+        return_document=True,
+    )
+    return jsonify(_serialize(result)), 200
+
+
+# ─────────────────────────────────────────────────────────────
+# PUT /api/billing/<bill_id> → edit bill details
+# ─────────────────────────────────────────────────────────────
+def edit_bill(bill_id):
+    data = request.json or {}
+    try:
+        bill = bills_collection.find_one({"_id": ObjectId(bill_id)})
+    except InvalidId:
+        return jsonify({"message": "Invalid bill ID"}), 400
+
+    if not bill:
+        return jsonify({"message": "Bill not found"}), 404
+
+    total_cost = data.get("total_cost")
+    discount_value = data.get("discount_value")
+    tax_percent = data.get("tax_percent")
+    notes = data.get("notes")
+    amount_paid_now = data.get("amount_paid_now")
+    payment_method = data.get("payment_method", "Cash")
+
+    updates = {}
+    now = datetime.now(timezone.utc)
+
+    # Process payment if any
+    new_payments = []
+    increment_paid = 0.0
+    if amount_paid_now is not None and amount_paid_now != "":
+        try:
+            val = float(amount_paid_now)
+            if val < 0:
+                raise ValueError
+            if val > 0:
+                increment_paid = val
+                new_payments.append({
+                    "amount": round(val, 2),
+                    "payment_method": payment_method if payment_method in VALID_PAYMENT_METHODS else "Cash",
+                    "notes": "Paid during bill adjustment",
+                    "created_at": now
+                })
+        except (TypeError, ValueError):
+            return jsonify({"message": "Invalid amount_paid_now provided"}), 400
+
+    # Determine amount_paid
+    if increment_paid > 0:
+        payment_history = bill.get("payment_history", [])
+        if not isinstance(payment_history, list):
+            payment_history = []
+        payment_history.extend(new_payments)
+        updates["payment_history"] = payment_history
+        updates["amount_paid"] = round(bill.get("amount_paid", 0) + increment_paid, 2)
+        amount_paid = updates["amount_paid"]
+    else:
+        amount_paid = bill.get("amount_paid", 0)
+
+    # If updating cost elements
+    if total_cost is not None or discount_value is not None or tax_percent is not None or increment_paid > 0:
+        try:
+            tc = float(total_cost) if total_cost is not None else bill["line_items"][0]["unit_price"]
+            dv = float(discount_value) if discount_value is not None else bill.get("discount_value", 0)
+            tp = float(tax_percent) if tax_percent is not None else bill.get("tax_percent", 0)
+        except (TypeError, ValueError):
+            return jsonify({"message": "Invalid numeric values provided"}), 400
+
+        dt = bill.get("discount_type", "flat")
+
+        line_items = [
+            {
+                "type": "other",
+                "description": "Dental Treatment Plan (Global Cost)",
+                "quantity": 1,
+                "unit_price": round(tc, 2),
+                "amount": round(tc, 2),
+            }
+        ]
+
+        totals = _compute_totals(line_items, dt, dv, tp)
+        
+        amount_due = round(totals["total_amount"] - amount_paid, 2)
+        
+        if amount_paid >= totals["total_amount"] and totals["total_amount"] > 0:
+            payment_status = "Paid"
+        elif amount_paid > 0:
+            payment_status = "Partial"
+        else:
+            payment_status = "Pending"
+
+        updates.update({
+            "line_items": line_items,
+            "subtotal": totals["subtotal"],
+            "discount_value": dv,
+            "discount_amount": totals["discount_amount"],
+            "tax_percent": tp,
+            "tax_amount": totals["tax_amount"],
+            "total_amount": totals["total_amount"],
+            "amount_due": max(amount_due, 0),
+            "payment_status": payment_status,
+        })
+
+    if notes is not None:
+        updates["notes"] = notes.strip()
+
+    if not updates:
+        return jsonify({"message": "Nothing to update"}), 400
+
+    updates["updated_at"] = now
+
+    result = bills_collection.find_one_and_update(
+        {"_id": ObjectId(bill_id)},
+        {"$set": updates},
+        return_document=True,
+    )
+    return jsonify(_serialize(result)), 200

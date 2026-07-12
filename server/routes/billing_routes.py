@@ -5,6 +5,8 @@ from controllers.billing_controller import (
     get_bill,
     update_payment,
     get_revenue_stats,
+    record_installment,
+    edit_bill,
 )
 from middleware.auth_middleware import token_required, role_required
 
@@ -29,6 +31,15 @@ billing_bp.route("/<bill_id>", methods=["GET"])(
     token_required(role_required(_ALL_STAFF)(get_bill))
 )
 
+billing_bp.route("/<bill_id>", methods=["PUT"])(
+    token_required(role_required(_MANAGERS)(edit_bill))
+)
+
 billing_bp.route("/<bill_id>/payment", methods=["PUT"])(
     token_required(role_required(_ALL_STAFF)(update_payment))
 )
+
+billing_bp.route("/<bill_id>/installment", methods=["POST"])(
+    token_required(role_required(_MANAGERS)(record_installment))
+)
+

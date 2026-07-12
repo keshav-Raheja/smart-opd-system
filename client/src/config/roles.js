@@ -19,4 +19,5 @@ export const ROLE_ACCESS = {
   opdManagement: [ROLES.ADMIN],   // NEW
   staffManagement: [ROLES.DOCTOR, ROLES.ADMIN],
   treatmentDashboard: [ROLES.DOCTOR],
+  dentistWorkspace: [ROLES.DOCTOR],
 };

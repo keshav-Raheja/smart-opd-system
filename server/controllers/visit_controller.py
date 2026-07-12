@@ -145,6 +145,7 @@ def get_patient_summary(patient_id):
                 "done":      tooth_data.get("done", False),
                 "status":    tooth_data.get("status", "completed" if tooth_data.get("done") else "planned"),
                 "session":   tooth_data.get("session", ""),
+                "planned_visits": tooth_data.get("planned_visits", ""),
                 "notes":     tooth_data.get("notes", ""),
                 "date":      iso,
             })

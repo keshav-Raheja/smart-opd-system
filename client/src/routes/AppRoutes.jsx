@@ -16,6 +16,7 @@ import MyFeeConfig from "../pages/MyFeeConfig";
 import OpdManagement from "../pages/OpdManagement";
 import StaffManagement from "../pages/StaffManagement";
 import Landing from "../pages/Landing";
+import DentistWorkspace from "../pages/DentistWorkspace";
 import MainLayout from "../layouts/MainLayout";
 
 import { ROLES } from "../config/roles";
@@ -188,6 +189,18 @@ function AppRoutes() {
             <ProtectedRoute routeKey="opdManagement" allowedRoles={[ROLES.ADMIN]}>
               <MainLayout>
                 <OpdManagement />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Dentist Workspace — Doctor only */}
+        <Route
+          path="/dentist-workspace"
+          element={
+            <ProtectedRoute routeKey="dentistWorkspace" allowedRoles={[ROLES.DOCTOR]}>
+              <MainLayout>
+                <DentistWorkspace />
               </MainLayout>
             </ProtectedRoute>
           }
