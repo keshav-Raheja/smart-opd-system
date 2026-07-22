@@ -74,6 +74,10 @@ export default function DentistWorkspace() {
   const [billNotes, setBillNotes] = useState("");
   const [billLoading, setBillLoading] = useState(false);
 
+  // Encounter-integrated payment states (Orchestrator Pattern)
+  const [encounterPaidAmount, setEncounterPaidAmount] = useState("");
+  const [encounterPaymentMethod, setEncounterPaymentMethod] = useState("Cash");
+
   // Edit bill states
   const [isEditingBill, setIsEditingBill] = useState(false);
   const [editTotalCost, setEditTotalCost] = useState("");
@@ -322,7 +326,7 @@ export default function DentistWorkspace() {
 
     try {
       const patientId = selectedPatient.patient_id || selectedPatient._id;
-      const res = await api.post("/visits/", {
+      const res = await api.post("/visits/orchestrate", {
         patient_id: patientId,
         patient_name: selectedPatient.name,
         appointment_id: activeAppointment?._id || undefined,
@@ -331,36 +335,20 @@ export default function DentistWorkspace() {
         diagnosis,
         notes,
         prescription: medicines.filter(m => m.name.trim()),
-        dental_chart: dentalChart
+        dental_chart: dentalChart,
+        amount_paid_now: encounterPaidAmount || 0,
+        payment_method: encounterPaymentMethod,
       });
 
-      // Update patient's global historical dental chart
-      const mergedDentalChart = { ...(selectedPatient?.historical_dental_chart || {}) };
-      
-      // Update/add all current entries
-      for (const [toothId, toothData] of Object.entries(dentalChart)) {
-        mergedDentalChart[toothId] = toothData;
-      }
-      
-      // Remove any in-progress or planned teeth that were cleared from the active chart
-      for (const toothId of Object.keys(mergedDentalChart)) {
-        if (mergedDentalChart[toothId]?.status !== "completed" && !dentalChart[toothId]) {
-          delete mergedDentalChart[toothId];
-        }
-      }
-
-      await api.put(`/patients/${selectedPatient._id}`, {
-        ...selectedPatient,
-        historical_dental_chart: mergedDentalChart
-      });
-
-      toast.success("Encounter Saved", "Clinical diagnosis, prescriptions, and charting saved.");
+      toast.success("Encounter Saved & Orchestrated", "Clinical details, automated pricing, queue update, and follow-ups processed.");
       
       // Reset encounter inputs
       setSymptoms("");
       setDiagnosis("");
       setNotes("");
       setMedicines([]);
+      setEncounterPaidAmount("");
+      setEncounterPaymentMethod("Cash");
       setActiveAppointment(null);
 
       // Reload patient profile data & appointments
@@ -1268,6 +1256,36 @@ export default function DentistWorkspace() {
                         />
                       </div>
 
+                      {/* Integrated payment details (Orchestrator Pattern) */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, background: "var(--color-surface-2)", padding: 14, borderRadius: 10, border: "1px solid var(--color-border)" }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label" style={{ fontSize: 11, fontWeight: 700, color: "var(--color-navy-900)" }}>Log Payment Received Now (₹)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 5000"
+                            value={encounterPaidAmount}
+                            onChange={e => setEncounterPaidAmount(e.target.value)}
+                            className="form-input"
+                            style={{ padding: "6px 10px", fontSize: 13 }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label" style={{ fontSize: 11, fontWeight: 700, color: "var(--color-navy-900)" }}>Payment Method</label>
+                          <select
+                            value={encounterPaymentMethod}
+                            onChange={e => setEncounterPaymentMethod(e.target.value)}
+                            className="form-input form-select"
+                            style={{ padding: "6px 10px", fontSize: 13 }}
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="Card">Card</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Insurance">Insurance</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleSaveConsultation}
@@ -1306,7 +1324,7 @@ export default function DentistWorkspace() {
                     {!globalBill ? (
                       <form onSubmit={handleCreateGlobalBill} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                         <div style={{ background: "var(--color-surface-2)", border: "1px dashed var(--color-border)", borderRadius: 10, padding: 14, fontSize: 13, color: "var(--color-text-secondary)" }}>
-                          No global treatment bill is currently configured for this patient. Specify the total treatment cost below. If they pay upfront now, log it in "Amount Paid Now".
+                          No global treatment bill is currently configured for this patient. You can specify a total cost manually below, or <strong>simply save the encounter above with dental chart procedures</strong> to auto-calculate the billing from the catalog.
                         </div>
                         <div className="grid-form-3" style={{ gap: 14 }}>
                           <div className="form-group">

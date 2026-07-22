@@ -11,6 +11,7 @@ from flask import request, jsonify
 from config.db import visits_collection, bills_collection, appointments_collection, patients_collection
 from bson import ObjectId
 from datetime import datetime
+from utils.workflow_orchestrator import ClinicalWorkflowOrchestrator
 
 
 def create_visit():
@@ -354,3 +355,22 @@ def get_treatments_dashboard():
         })
         
     return jsonify(output), 200
+
+
+def orchestrate_encounter_endpoint():
+    payload = request.json or {}
+    user_id = request.user.get("user_id")
+    opd_id = request.user.get("opd_id")
+    user_name = request.user.get("name", "Doctor")
+    
+    if not payload.get("patient_id"):
+        return jsonify({"message": "patient_id is required"}), 400
+        
+    try:
+        result = ClinicalWorkflowOrchestrator.orchestrate_encounter(
+            payload, user_id, opd_id, user_name
+        )
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"[OrchestrateController] Error running clinical orchestrator: {e}")
+        return jsonify({"message": "Orchestration failed", "error": str(e)}), 500

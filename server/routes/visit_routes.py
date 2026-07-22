@@ -6,6 +6,7 @@ from controllers.visit_controller import (
     get_patient_summary,
     search_diagnoses,
     get_treatments_dashboard,
+    orchestrate_encounter_endpoint,
 )
 
 from middleware.auth_middleware import (
@@ -19,6 +20,13 @@ visit_bp = Blueprint("visit_bp", __name__)
 visit_bp.route("/", methods=["POST"])(
     token_required(
         role_required(["Doctor"])(create_visit)
+    )
+)
+
+# ── Orchestrated Clinical Encounter ───────────────────────────────────────────
+visit_bp.route("/orchestrate", methods=["POST"])(
+    token_required(
+        role_required(["Doctor"])(orchestrate_encounter_endpoint)
     )
 )
 
